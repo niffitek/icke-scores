@@ -4,22 +4,27 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-
-const ADMIN_TOKEN = process.env.NEXT_PUBLIC_ADMIN_TOKEN;
+import api from "@/lib/api";
 
 export default function AdminLogin() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const router = useRouter();
 
-    const checkPassword = () => {
-        if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
-            if (typeof window !== "undefined") {
-                localStorage.setItem("adminAuthorized", "true");
-                localStorage.setItem("adminToken", ADMIN_TOKEN || "");
+    const handleLogin = async () => {
+        setError("");
+        try {
+            const res = await api.post("/api/api.php?path=login", { password });
+            if (res.data.token) {
+                if (typeof window !== "undefined") {
+                    localStorage.setItem("adminAuthorized", "true");
+                    localStorage.setItem("adminToken", res.data.token);
+                }
+                router.replace("/admin");
+            } else {
+                setError("Unbekannter Fehler beim Login.");
             }
-            router.replace("/admin");
-        } else {
+        } catch (err: any) {
             setError("Falsches Passwort! Probier's nochmal!");
         }
     };
@@ -34,7 +39,7 @@ export default function AdminLogin() {
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                 />
-                <Button onClick={checkPassword}>Login</Button>
+                <Button onClick={handleLogin}>Login</Button>
                 {error && <p>{error}</p>}
             </div>
         </div>
