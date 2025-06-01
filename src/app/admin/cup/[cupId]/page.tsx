@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,9 @@ import { FaPen, FaTrash, FaArrowLeft } from "react-icons/fa";
 import { v4 as uuidv4 } from 'uuid';
 import api from "@/lib/api";
 import { useAdminAuth } from "@/lib/hooks/useAdminAuth";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import TeamsTabContent from "./TeamsTabContent";
+import VorrundeTabContent from "./VorrundeTabContent";
 
 const STATE_OPTIONS = [
     "Bevorstehend",
@@ -33,29 +36,36 @@ export default function CupDetails() {
     const { cupId } = useParams();
     const router = useRouter();
     const [cup, setCup] = useState<any>(null);
-    const [teams, setTeams] = useState<Team[]>([]);
     const [editing, setEditing] = useState(false);
     const [editCup, setEditCup] = useState<any>(null);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
-    const [editTeam, setEditTeam] = useState<any>(null);
-    const [showEditDialog, setShowEditDialog] = useState(false);
-    const [teamEditLoading, setTeamEditLoading] = useState(false);
-    const [teamEditError, setTeamEditError] = useState("");
-    const [teamDeleteLoading, setTeamDeleteLoading] = useState("");
-    const [showCreateDialog, setShowCreateDialog] = useState(false);
-    const [newTeam, setNewTeam] = useState({ name: '', contact: '' });
-    const [createLoading, setCreateLoading] = useState(false);
-    const [createError, setCreateError] = useState('');
+    const [tab, setTab] = useState('teams');
+    const [teams, setTeams] = useState<any[]>([]);
+    const [showStartTimeDialog, setShowStartTimeDialog] = useState(false);
+    const [startTime, setStartTime] = useState("09:00");
+    const [savingGames, setSavingGames] = useState(false);
+    const [gameError, setGameError] = useState("");
+    const [gameSuccess, setGameSuccess] = useState("");
+    const [groups, setGroups] = useState<any[]>([]);
+    const [groupTeams, setGroupTeams] = useState<any[]>([]);
+    const [tournaments, setTournaments] = useState<any[]>([]);
 
     useEffect(() => {
         api.get(`?path=cups`).then(res => {
             const cups = res.data;
             setCup(cups.find((c: any) => c.id === cupId));
         });
+        // Fetch teams for this cup
         api.get(`?path=teams`).then(res => {
-            setTeams(res.data);
+            setTeams(res.data.filter((t: any) => t.icke_cup_id === cupId));
+        });
+        // Fetch groups and group_teams
+        api.get(`?path=groups`).then(res => setGroups(res.data));
+        api.get(`?path=group_teams`).then(res => setGroupTeams(res.data));
+        api.get(`?path=tournaments`).then(res => {
+            setTournaments(res.data.filter((t: any) => t.icke_cup_id === cupId));
         });
     }, [cupId]);
 
@@ -107,86 +117,103 @@ export default function CupDetails() {
         }
     };
 
-    const handleEditTeam = (team: any) => {
-        setEditTeam({ ...team });
-        setShowEditDialog(true);
-        setTeamEditError("");
+    // Helper: group teams by group and assign numbers 1-4
+    const getGroupedTeams = () => {
+        const grouped: Record<string, any[]> = { A: [], B: [], C: [], D: [] };
+        teams.forEach(team => {
+            // Find group assignment for this team
+            const gt = groupTeams.find((gt: any) => gt.team_id === team.id);
+            if (!gt) return;
+            const group = groups.find((g: any) => g.id === gt.group_id);
+            if (group && grouped[group.name]) grouped[group.name].push(team);
+        });
+        // Sort each group by name for consistent numbering
+        Object.keys(grouped).forEach(g => grouped[g].sort((a, b) => a.name.localeCompare(b.name)));
+        return grouped;
     };
 
-    const handleSaveTeam = async () => {
-        setTeamEditLoading(true);
-        setTeamEditError("");
-        const token = localStorage.getItem("adminToken");
-        try {
-            await api.put(`?path=teams`, {
-                id: editTeam.id,
-                name: editTeam.name,
-                contact: editTeam.contact,
-            }, {
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                },
-            });
-            setShowEditDialog(false);
-            // Refresh teams
-            api.get(`?path=teams`).then(res => setTeams(res.data));
-        } catch (e) {
-            setTeamEditError("Fehler beim Speichern des Teams");
-        } finally {
-            setTeamEditLoading(false);
-        }
-    };
+    // Schedule as per your table
+    const SCHEDULE = [
+        ["A1-A4", "B2-B3", "C1-C2", "D1-D2", "C3-C4", "A2-A3"],
+        ["D1-D3", "A2-A3", "B1-B4", "B2-B3", "D2-D4", "C1-C3"],
+        ["C1-C3", "D2-D3", "A3-A4", "A1-A2", "B1-B4", "C2-C4"],
+        ["B2-B4", "D2-D4", "C3-C4", "B1-B3", "D1-D3", "A1-A4"],
+        ["A1-A3", "B1-B3", "C2-C4", "B2-B4", "A2-A4", "D1-D4"],
+        ["D1-D2", "A1-A2", "B1-B2", "D3-D4", "C1-C2", "B3-B4"],
+        ["C1-C4", "D3-D4", "A2-A4", "A1-A3", "B1-B2", "C2-C3"],
+        ["D1-D4", "C2-C3", "B3-B4", "D2-D3", "C1-C4", "A3-A4"]
+    ];
+    // Court 1-3: sitzen, 4-6: stand
+    const COURT_TYPE = [true, true, true, false, false, false];
 
-    const handleDeleteTeam = async (teamId: string) => {
-        if (!window.confirm("Willst du dieses Team wirklich löschen?")) return;
-        setTeamDeleteLoading(teamId);
-        const token = localStorage.getItem("adminToken");
+    const handleCreateGames = async () => {
+        setSavingGames(true);
+        setGameError("");
+        setGameSuccess("");
         try {
-            await api.delete(`?path=teams&id=${teamId}`, {
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                },
+            // 1. Group teams
+            const grouped = getGroupedTeams();
+            // 2. Map group+number to teamId
+            const getTeamId = (group: string, num: number) => grouped[group][num - 1]?.id;
+            // 3. Generate games
+            const games = [];
+            let start = new Date();
+            const [h, m] = startTime.split(":");
+            start.setHours(Number(h), Number(m), 0, 0);
+            for (let round = 0; round < SCHEDULE.length; round++) {
+                const roundTime = new Date(start.getTime() + round * 30 * 60000);
+                for (let court = 0; court < 6; court++) {
+                    const match = SCHEDULE[round][court];
+                    const [left, right] = match.split("-");
+                    const groupL = left[0], numL = Number(left[1]);
+                    const groupR = right[0], numR = Number(right[1]);
+                    const team1Id = getTeamId(groupL, numL);
+                    const team2Id = getTeamId(groupR, numR);
+                    if (!team1Id || !team2Id) continue; // skip if mapping fails
+                    const sittingTournament = tournaments.find(t => t.sitting === '1');
+                    const standingTournament = tournaments.find(t => t.sitting === '0');
+                    const pad = (n: number) => n.toString().padStart(2, '0');
+                    const localDateString = `${roundTime.getFullYear()}-${pad(roundTime.getMonth() + 1)}-${pad(roundTime.getDate())}T${pad(roundTime.getHours())}:${pad(roundTime.getMinutes())}:00`;
+                    games.push({
+                        id: uuidv4(),
+                        team_1_id: team1Id,
+                        team_2_id: team2Id,
+                        ref_team_id: null,
+                        points_team_1: 0,
+                        points_team_2: 0,
+                        start_at: localDateString,
+                        tournament_id: COURT_TYPE[court] ? sittingTournament?.id : standingTournament?.id,
+                        round: "Vorrunde",
+                        sitting: COURT_TYPE[court] ? 1 : 0,
+                        court: court + 1
+                    });
+                }
+            }
+            // 4. Save games (bulk insert if supported, else one by one)
+            const token = localStorage.getItem("adminToken");
+            await Promise.all(games.map(game =>
+                api.post(`?path=games`, game, { headers: { "Authorization": `Bearer ${token}` } })
+            ));
+            // 5. Update cup status
+            await api.put(`?path=cups`, { ...cup, state: "Vorrunde" }, { headers: { "Authorization": `Bearer ${token}` } });
+            setGameSuccess("Spiele erfolgreich erstellt und Status aktualisiert!");
+            setShowStartTimeDialog(false);
+            // Refresh cup data
+            api.get(`?path=cups`).then(res => {
+                const cups = res.data;
+                setCup(cups.find((c: any) => c.id === cupId));
             });
-            // Refresh teams
-            api.get(`?path=teams`).then(res => setTeams(res.data));
         } catch (e) {
-            alert("Fehler beim Löschen des Teams");
+            setGameError("Fehler beim Erstellen der Spiele oder Aktualisieren des Status.");
         } finally {
-            setTeamDeleteLoading("");
-        }
-    };
-
-    const handleCreateTeam = async () => {
-        setCreateLoading(true);
-        setCreateError('');
-        const token = localStorage.getItem("adminToken");
-        try {
-            await api.post(`?path=teams`, {
-                id: uuidv4(),
-                name: newTeam.name,
-                contact: newTeam.contact,
-                place: teams.length + 1,
-                icke_cup_id: cup.id,
-            }, {
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                },
-            });
-            setShowCreateDialog(false);
-            setNewTeam({ name: '', contact: '' });
-            // Refresh teams
-            api.get(`?path=teams`).then(res => setTeams(res.data));
-        } catch (e) {
-            setCreateError("Fehler beim Anlegen des Teams");
-        } finally {
-            setCreateLoading(false);
+            setSavingGames(false);
         }
     };
 
     if (!cup || !editCup) return <div>Lade Cup...</div>;
 
     return (
-        <div className="max-w-xl mx-auto bg-white rounded-md p-4 mt-4">
+        <div className="max-w-4xl mx-auto bg-white rounded-md p-4 mt-4">
             <div className="flex flex-row justify-between items-center mb-4">
                 <div className="flex flex-row items-center gap-2">
                     <Button variant="ghost" size="icon" className="p-2" onClick={() => router.push('/admin')} aria-label="Zurück zur Übersicht">
@@ -194,8 +221,47 @@ export default function CupDetails() {
                     </Button>
                     <h1 className="text-xl font-bold">Cup Details</h1>
                 </div>
-                {!editing && <Button onClick={handleEdit}>Bearbeiten</Button>}
+                <div className="flex flex-row items-center gap-2">
+                    { ["Bevorstehend"].includes(cup.state) && (
+                        <Dialog open={showStartTimeDialog} onOpenChange={setShowStartTimeDialog}>
+                            <DialogTrigger asChild>
+                                <Button
+                                    variant="default"
+                                    disabled={!(teams.length === 16 && ["Bevorstehend"].includes(cup.state))}
+                                    title={teams.length !== 16 ? "Es müssen genau 16 Teams angelegt sein." : cup.state !== "Bevorstehend" ? "Status muss 'Bevorstehend' sein." : ""}
+                                    onClick={() => setShowStartTimeDialog(true)}
+                                >
+                                    Zur Vorrunde fortfahren
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Startzeit der Vorrunde festlegen</DialogTitle>
+                                </DialogHeader>
+                                <div className="flex flex-col gap-4 mt-2">
+                                    <label className="font-medium">Startzeit
+                                        <input
+                                            type="time"
+                                            className="border rounded px-2 py-1 mt-1"
+                                            value={startTime}
+                                            onChange={e => setStartTime(e.target.value)}
+                                        />
+                                    </label>
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => setShowStartTimeDialog(false)} disabled={savingGames}>Abbrechen</Button>
+                                    <Button onClick={handleCreateGames} disabled={savingGames}>{savingGames ? "Speichern..." : "Bestätigen"}</Button>
+                                </DialogFooter>
+                                {gameError && <p className="text-red-500 text-sm mt-2">{gameError}</p>}
+                                {gameSuccess && <p className="text-green-600 text-sm mt-2">{gameSuccess}</p>}
+                            </DialogContent>
+                        </Dialog>
+                    )}
+                    {!editing && <Button onClick={handleEdit}>Bearbeiten</Button>}
+                </div>
             </div>
+            {/* Navigation Menu */}
+            
             {editing ? (
                 <div className="flex flex-col gap-2 mb-4">
                     <label className="font-medium">Titel
@@ -236,99 +302,23 @@ export default function CupDetails() {
                     <p><span className="font-medium">Status:</span> {cup.state}</p>
                 </div>
             )}
-
-            <div className="flex flex-row justify-between items-center mb-2">
-                <h2 className="text-lg font-semibold mb-2">Teams</h2>
-                <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-                    <DialogTrigger asChild>
-                        <Button onClick={() => setShowCreateDialog(true)} disabled={teams.filter(t => t.icke_cup_id === cup.id).length >= 16}>
-                            Team anlegen
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Neues Team anlegen</DialogTitle>
-                        </DialogHeader>
-                        <div className="flex flex-col gap-2">
-                            <Input
-                                placeholder="Name"
-                                value={newTeam.name}
-                                onChange={e => setNewTeam({ ...newTeam, name: e.target.value })}
-                            />
-                            <Input
-                                placeholder="Kontakt"
-                                value={newTeam.contact}
-                                onChange={e => setNewTeam({ ...newTeam, contact: e.target.value })}
-                            />
-                            {createError && <p className="text-red-500 text-sm">{createError}</p>}
-                        </div>
-                        <DialogFooter>
-                            <Button onClick={handleCreateTeam} disabled={createLoading || !newTeam.name}>
-                                {createLoading ? "Anlegen..." : "Anlegen"}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            </div>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Kontakt</TableHead>
-                        <TableHead className="w-24 text-right"></TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {teams.map((team: any) => (
-                        <TableRow key={team.id}>
-                            <TableCell>{team.name}</TableCell>
-                            <TableCell>{team.contact}</TableCell>
-                            <TableCell className="text-right">
-                                <Dialog open={showEditDialog && editTeam?.id === team.id} onOpenChange={open => { if (!open) setShowEditDialog(false); }}>
-                                    <DialogTrigger asChild>
-                                        <Button variant="outline" size="icon" className="p-2 mr-2" onClick={() => handleEditTeam(team)}>
-                                            <FaPen />
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Team bearbeiten</DialogTitle>
-                                        </DialogHeader>
-                                        <div className="flex flex-col gap-2">
-                                            <Input
-                                                placeholder="Name"
-                                                value={editTeam?.name || ""}
-                                                onChange={e => setEditTeam({ ...editTeam, name: e.target.value })}
-                                            />
-                                            <Input
-                                                placeholder="Kontakt"
-                                                value={editTeam?.contact || ""}
-                                                onChange={e => setEditTeam({ ...editTeam, contact: e.target.value })}
-                                            />
-                                            {teamEditError && <p className="text-red-500 text-sm">{teamEditError}</p>}
-                                        </div>
-                                        <DialogFooter>
-                                            <Button onClick={handleSaveTeam} disabled={teamEditLoading}>
-                                                {teamEditLoading ? "Speichern..." : "Speichern"}
-                                            </Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="p-2"
-                                    onClick={() => handleDeleteTeam(team.id)}
-                                    disabled={teamDeleteLoading === team.id}
-                                    aria-label="Löschen"
-                                >
-                                    <FaTrash className="text-red-500" />
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+            <Tabs value={tab} className="mb-6" onValueChange={setTab}>
+                <TabsList>
+                    <TabsTrigger value="teams">Teams</TabsTrigger>
+                    <TabsTrigger value="vorrunde">Vorrunde</TabsTrigger>
+                    <TabsTrigger value="finalrunde">Finalrunde</TabsTrigger>
+                    <TabsTrigger value="auswertung">Auswertung</TabsTrigger>
+                </TabsList>
+                <TabsContent value="teams">
+                    <TeamsTabContent cupId={typeof cupId === 'string' ? cupId : ''} cup={cup} />
+                </TabsContent>
+                <TabsContent value="vorrunde">
+                    <VorrundeTabContent cupId={typeof cupId === 'string' ? cupId : ''} />
+                </TabsContent>
+                {/* Add more TabsContent for other tabs as needed */}
+            </Tabs>
+            {/* Step 1: Proceed to Vorrunde button */}
+            
         </div>
     );
 }
