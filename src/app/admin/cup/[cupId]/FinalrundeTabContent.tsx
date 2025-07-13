@@ -6,7 +6,7 @@ import { FaPen } from "react-icons/fa";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
-export default function VorrundeTabContent({ cupId }: { cupId: string }) {
+export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
     const [games, setGames] = useState<any[]>([]);
     const [teams, setTeams] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -31,8 +31,8 @@ export default function VorrundeTabContent({ cupId }: { cupId: string }) {
         ]).then(([gamesRes, teamsRes]) => {
             const teams = teamsRes.data.filter((t: any) => t.icke_cup_id === cupId);
             const teamMap = Object.fromEntries(teams.map((t: any) => [t.id, t.name]));
-            // Filter by cupId and Vorrunde
-            const filtered = gamesRes.data.filter((g: any) => g.round === 'Vorrunde');
+            // Filter by cupId and Finalrunde
+            const filtered = gamesRes.data.filter((g: any) => g.round === 'Finalrunde');
 
             // Map team IDs to names and calculate game results
             const mapped = filtered.map((g: any) => {
@@ -45,10 +45,13 @@ export default function VorrundeTabContent({ cupId }: { cupId: string }) {
                 
                 // Determine game winner (best of 2 rounds)
                 let gameWinner = null;
-                if (totalPointsTeam1 === totalPointsTeam2) {
-                    gameWinner = null;
-                } else {
-                    gameWinner = totalPointsTeam1 > totalPointsTeam2 ? g.team_1_id : g.team_2_id;
+                if (round1Won !== null && round2Won !== null) {
+                    if (round1Won === round2Won) {
+                        gameWinner = round1Won === 1 ? g.team_1_id : g.team_2_id;
+                    } else {
+                        // If rounds are split, use total points as tiebreaker
+                        gameWinner = totalPointsTeam1 > totalPointsTeam2 ? g.team_1_id : g.team_2_id;
+                    }
                 }
                 
                 return {
@@ -149,7 +152,7 @@ export default function VorrundeTabContent({ cupId }: { cupId: string }) {
             });
             const teams = teamsRes.data.filter((t: any) => t.icke_cup_id === cupId);
             const teamMap = Object.fromEntries(teams.map((t: any) => [t.id, t.name]));
-            const filtered = gamesRes.data.filter((g: any) => g.round === 'Vorrunde');
+            const filtered = gamesRes.data.filter((g: any) => g.round === 'Finalrunde');
             
             const mapped = filtered.map((g: any) => {
                 const round1Won = g.round1_winner === g.team_1_id ? 1 : g.round1_winner === g.team_2_id ? 0 : null;
@@ -158,10 +161,12 @@ export default function VorrundeTabContent({ cupId }: { cupId: string }) {
                 const totalPointsTeam2 = (parseInt(g.round1_points_team_2, 10) || 0) + (parseInt(g.round2_points_team_2, 10) || 0);
                 
                 let gameWinner = null;
-                if (totalPointsTeam1 === totalPointsTeam2) {
-                    gameWinner = null;
-                } else {
-                    gameWinner = totalPointsTeam1 > totalPointsTeam2 ? g.team_1_id : g.team_2_id;
+                if (round1Won !== null && round2Won !== null) {
+                    if (round1Won === round2Won) {
+                        gameWinner = round1Won === 1 ? g.team_1_id : g.team_2_id;
+                    } else {
+                        gameWinner = totalPointsTeam1 > totalPointsTeam2 ? g.team_1_id : g.team_2_id;
+                    }
                 }
                 
                 return {
@@ -197,12 +202,12 @@ export default function VorrundeTabContent({ cupId }: { cupId: string }) {
     };
 
     if (loading) return <div>Lade Spiele...</div>;
-    if (games.length === 0) return <div>Keine Vorrundenspiele gefunden.</div>;
+    if (games.length === 0) return <div>Keine Finalrundenspiele gefunden.</div>;
 
     return (
         <>
             <div className="flex flex-row justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold">Vorrundenspiele</h2>
+                <h2 className="text-lg font-semibold">Finalrundenspiele</h2>
             </div>
             
             <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>

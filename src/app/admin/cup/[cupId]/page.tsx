@@ -15,6 +15,7 @@ import { useAdminAuth } from "@/lib/hooks/useAdminAuth";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import TeamsTabContent from "./TeamsTabContent";
 import VorrundeTabContent from "./VorrundeTabContent";
+import FinalrundeTabContent from "./FinalrundeTabContent";
 
 const STATE_OPTIONS = [
     "Bevorstehend",
@@ -51,6 +52,8 @@ export default function CupDetails() {
     const [groups, setGroups] = useState<any[]>([]);
     const [groupTeams, setGroupTeams] = useState<any[]>([]);
     const [tournaments, setTournaments] = useState<any[]>([]);
+    const [showFinalrundeDialog, setShowFinalrundeDialog] = useState(false);
+    const [finalrundeStartTime, setFinalrundeStartTime] = useState("13:30");
 
     useEffect(() => {
         api.get(`?path=cups`).then(res => {
@@ -210,6 +213,270 @@ export default function CupDetails() {
         }
     };
 
+    // Finalrunde schedule
+    const FINALRUNDE_SCHEDULE = [
+        ["E1-E4", "F2-F3", "G1-G2", "H1-H2", "G3-G4", "E2-E3"],
+        ["H1-H3", "E2-E3", "F1-F4", "F2-F3", "H2-H4", "G1-G3"],
+        ["G1-G3", "H2-H3", "E3-E4", "E1-E2", "F1-F4", "G2-G4"],
+        ["F2-F4", "H2-H4", "G3-G4", "F1-F3", "H1-H3", "E1-E4"],
+        ["E1-E3", "F1-F3", "G2-G4", "F2-F4", "E2-E4", "H1-H4"],
+        ["H1-H2", "E1-E2", "F1-F2", "H3-H4", "G1-G2", "F3-F4"],
+        ["G1-G4", "H3-H4", "E2-E4", "F1-F3", "F1-F2", "G2-G3"],
+        ["H1-H4", "G2-G3", "F3-F4", "H2-H3", "G1-G4", "E3-E4"]
+    ];
+
+    const handleCreateFinalrunde = async () => {
+        setSavingGames(true);
+        setGameError("");
+        setGameSuccess("");
+        try {
+            const token = localStorage.getItem("adminToken");
+            
+            // 1. Get all Vorrunde games with their results
+            const gamesRes = await api.get(`?path=games`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const vorrundeGames = gamesRes.data.filter((g: any) => g.round === 'Vorrunde');
+            
+            // 2. Get all teams
+            const teamsRes = await api.get(`?path=teams`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const allTeams = teamsRes.data.filter((t: any) => t.icke_cup_id === cupId);
+            
+            // 3. Evaluate games and calculate team performance
+            const teamStats: Record<string, any> = {};
+            allTeams.forEach((team: any) => {
+                teamStats[team.id] = {
+                    id: team.id,
+                    name: team.name,
+                    roundsWon: 0,
+                    totalPoints: 0,
+                    gamesPlayed: 0
+                };
+            });
+            
+            // Calculate stats for each team
+            vorrundeGames.forEach((game: any) => {
+                const team1Stats = teamStats[game.team_1_id];
+                const team2Stats = teamStats[game.team_2_id];
+                
+                if (team1Stats && team2Stats) {
+                    team1Stats.gamesPlayed++;
+                    team2Stats.gamesPlayed++;
+                    
+                    // Calculate rounds won and total points
+                    const round1Team1Won = game.round1_winner === game.team_1_id;
+                    const round2Team1Won = game.round2_winner === game.team_1_id;
+                    const round1Team2Won = game.round1_winner === game.team_2_id;
+                    const round2Team2Won = game.round2_winner === game.team_2_id;
+                    
+                    if (round1Team1Won) team1Stats.roundsWon++;
+                    if (round2Team1Won) team1Stats.roundsWon++;
+                    if (round1Team2Won) team2Stats.roundsWon++;
+                    if (round2Team2Won) team2Stats.roundsWon++;
+                    
+                    team1Stats.totalPoints += (parseInt(game.round1_points_team_1) || 0) + (parseInt(game.round2_points_team_1) || 0);
+                    team2Stats.totalPoints += (parseInt(game.round1_points_team_2) || 0) + (parseInt(game.round2_points_team_2) || 0);
+                }
+            });
+            
+            // 4. Group teams by tournament and evaluate each group
+            const sittingTournament = tournaments.find(t => t.sitting === '1');
+            const standingTournament = tournaments.find(t => t.sitting === '0');
+            
+            // Get groups for each tournament
+            const sittingGroups = groups.filter(g => g.tournament_id === sittingTournament?.id);
+            const standingGroups = groups.filter(g => g.tournament_id === standingTournament?.id);
+            
+            // Evaluate sitting tournament groups
+            const sittingGroupResults: Record<string, any[]> = {};
+            sittingGroups.forEach(group => {
+                const groupTeamAssignments = groupTeams.filter((gt: any) => gt.group_id === group.id)
+                    .map((gt: any) => teamStats[gt.team_id])
+                    .filter(Boolean);
+                
+                // Sort by rounds won, then by total points
+                groupTeamAssignments.sort((a: any, b: any) => {
+                    if (a.roundsWon !== b.roundsWon) return b.roundsWon - a.roundsWon;
+                    if (a.totalPoints !== b.totalPoints) return b.totalPoints - a.totalPoints;
+                    return 0; // Could add head-to-head comparison here
+                });
+                
+                sittingGroupResults[group.name] = groupTeamAssignments;
+            });
+            
+            // Evaluate standing tournament groups
+            const standingGroupResults: Record<string, any[]> = {};
+            standingGroups.forEach(group => {
+                const groupTeamAssignments = groupTeams.filter((gt: any) => gt.group_id === group.id)
+                    .map((gt: any) => teamStats[gt.team_id])
+                    .filter(Boolean);
+                
+                groupTeamAssignments.sort((a: any, b: any) => {
+                    if (a.roundsWon !== b.roundsWon) return b.roundsWon - a.roundsWon;
+                    if (a.totalPoints !== b.totalPoints) return b.totalPoints - a.totalPoints;
+                    return 0;
+                });
+                
+                standingGroupResults[group.name] = groupTeamAssignments;
+            });
+            
+            // 5. Calculate points for each team
+            const teamPoints: Record<string, number> = {};
+            
+            // Sitting tournament points: 1st=11, 2nd=9, 3rd=7, 4th=5
+            Object.values(sittingGroupResults).forEach(groupTeams => {
+                groupTeams.forEach((team: any, index) => {
+                    const points = [11, 9, 7, 5][index] || 0;
+                    teamPoints[team.id] = (teamPoints[team.id] || 0) + points;
+                });
+            });
+            
+            // Standing tournament points: 1st=10, 2nd=8, 3rd=6, 4th=4
+            Object.values(standingGroupResults).forEach(groupTeams => {
+                groupTeams.forEach((team: any, index) => {
+                    const points = [10, 8, 6, 4][index] || 0;
+                    teamPoints[team.id] = (teamPoints[team.id] || 0) + points;
+                });
+            });
+            
+            // 6. Create final ranking
+            const finalRanking = Object.entries(teamPoints)
+                .map(([teamId, points]) => ({
+                    teamId,
+                    points,
+                    ...teamStats[teamId]
+                }))
+                .sort((a, b) => b.points - a.points);
+            
+            // 7. Create new tournaments for Finalrunde
+            const finalrundeSittingTournamentId = uuidv4();
+            const finalrundeStandingTournamentId = uuidv4();
+            
+            await Promise.all([
+                api.post(`?path=tournaments`, { 
+                    id: finalrundeSittingTournamentId, 
+                    icke_cup_id: cupId, 
+                    sitting: 1 
+                }, { headers: { "Authorization": `Bearer ${token}` } }),
+                api.post(`?path=tournaments`, { 
+                    id: finalrundeStandingTournamentId, 
+                    icke_cup_id: cupId, 
+                    sitting: 0 
+                }, { headers: { "Authorization": `Bearer ${token}` } })
+            ]);
+            
+            // 8. Create new groups E, F, G, H
+            const groupE = finalRanking.slice(0, 4);
+            const groupF = finalRanking.slice(4, 8);
+            const groupG = finalRanking.slice(8, 12);
+            const groupH = finalRanking.slice(12, 16);
+            
+            // Create groups in database
+            const groupEId = uuidv4();
+            const groupFId = uuidv4();
+            const groupGId = uuidv4();
+            const groupHId = uuidv4();
+            
+            await Promise.all([
+                api.post(`?path=groups`, { id: groupEId, tournament_id: finalrundeSittingTournamentId, name: 'E' }, { headers: { "Authorization": `Bearer ${token}` } }),
+                api.post(`?path=groups`, { id: groupFId, tournament_id: finalrundeSittingTournamentId, name: 'F' }, { headers: { "Authorization": `Bearer ${token}` } }),
+                api.post(`?path=groups`, { id: groupGId, tournament_id: finalrundeStandingTournamentId, name: 'G' }, { headers: { "Authorization": `Bearer ${token}` } }),
+                api.post(`?path=groups`, { id: groupHId, tournament_id: finalrundeStandingTournamentId, name: 'H' }, { headers: { "Authorization": `Bearer ${token}` } })
+            ]);
+            
+            // 9. Assign teams to new groups
+            const groupAssignments = [
+                ...groupE.map(team => ({ group_id: groupEId, team_id: team.teamId })),
+                ...groupF.map(team => ({ group_id: groupFId, team_id: team.teamId })),
+                ...groupG.map(team => ({ group_id: groupGId, team_id: team.teamId })),
+                ...groupH.map(team => ({ group_id: groupHId, team_id: team.teamId }))
+            ];
+            
+            await Promise.all(groupAssignments.map(assignment =>
+                api.post(`?path=group_teams`, assignment, { headers: { "Authorization": `Bearer ${token}` } })
+            ));
+            
+            // 10. Create final round games
+            const finalGames = [];
+            let start = new Date();
+            const [h, m] = finalrundeStartTime.split(":");
+            start.setHours(Number(h), Number(m), 0, 0);
+            
+            // Create a mapping of group names to their team assignments
+            const groupTeamMap: Record<string, any[]> = {
+                'E': groupAssignments.filter(gt => gt.group_id === groupEId),
+                'F': groupAssignments.filter(gt => gt.group_id === groupFId),
+                'G': groupAssignments.filter(gt => gt.group_id === groupGId),
+                'H': groupAssignments.filter(gt => gt.group_id === groupHId)
+            };
+            
+            const getTeamIdFromGroup = (groupName: string, position: number) => {
+                const groupTeams = groupTeamMap[groupName];
+                if (!groupTeams || position < 1 || position > groupTeams.length) return null;
+                return groupTeams[position - 1]?.team_id;
+            };
+            
+            for (let round = 0; round < FINALRUNDE_SCHEDULE.length; round++) {
+                const roundTime = new Date(start.getTime() + round * 30 * 60000);
+                for (let court = 0; court < 6; court++) {
+                    const match = FINALRUNDE_SCHEDULE[round][court];
+                    if (!match) continue;
+                    
+                    const [left, right] = match.split("-");
+                    const groupL = left[0], numL = Number(left[1]);
+                    const groupR = right[0], numR = Number(right[1]);
+                    
+                    const team1Id = getTeamIdFromGroup(groupL, numL);
+                    const team2Id = getTeamIdFromGroup(groupR, numR);
+                    
+                    if (!team1Id || !team2Id) continue;
+                    
+                    const pad = (n: number) => n.toString().padStart(2, '0');
+                    const localDateString = `${roundTime.getFullYear()}-${pad(roundTime.getMonth() + 1)}-${pad(roundTime.getDate())}T${pad(roundTime.getHours())}:${pad(roundTime.getMinutes())}:00`;
+                    
+                    finalGames.push({
+                        id: uuidv4(),
+                        team_1_id: team1Id,
+                        team_2_id: team2Id,
+                        ref_team_id: null,
+                        points_team_1: 0,
+                        points_team_2: 0,
+                        start_at: localDateString,
+                        tournament_id: COURT_TYPE[court] ? finalrundeSittingTournamentId : finalrundeStandingTournamentId,
+                        round: "Finalrunde",
+                        sitting: COURT_TYPE[court] ? 1 : 0,
+                        court: court + 1
+                    });
+                }
+            }
+            
+            // Save final games
+            await Promise.all(finalGames.map(game =>
+                api.post(`?path=games`, game, { headers: { "Authorization": `Bearer ${token}` } })
+            ));
+            
+            // 11. Update cup status
+            await api.put(`?path=cups`, { ...cup, state: "Finalrunde" }, { headers: { "Authorization": `Bearer ${token}` } });
+            
+            setGameSuccess("Finalrunde erfolgreich erstellt!");
+            setShowFinalrundeDialog(false);
+            
+            // Refresh cup data
+            api.get(`?path=cups`).then(res => {
+                const cups = res.data;
+                setCup(cups.find((c: any) => c.id === cupId));
+            });
+            
+        } catch (e) {
+            setGameError("Fehler beim Erstellen der Finalrunde.");
+            console.error(e);
+        } finally {
+            setSavingGames(false);
+        }
+    };
+
     if (!cup || !editCup) return <div>Lade Cup...</div>;
 
     return (
@@ -251,6 +518,40 @@ export default function CupDetails() {
                                 <DialogFooter>
                                     <Button variant="outline" onClick={() => setShowStartTimeDialog(false)} disabled={savingGames}>Abbrechen</Button>
                                     <Button onClick={handleCreateGames} disabled={savingGames}>{savingGames ? "Speichern..." : "Bestätigen"}</Button>
+                                </DialogFooter>
+                                {gameError && <p className="text-red-500 text-sm mt-2">{gameError}</p>}
+                                {gameSuccess && <p className="text-green-600 text-sm mt-2">{gameSuccess}</p>}
+                            </DialogContent>
+                        </Dialog>
+                    )}
+                    {cup.state === "Vorrunde" && (
+                        <Dialog open={showFinalrundeDialog} onOpenChange={setShowFinalrundeDialog}>
+                            <DialogTrigger asChild>
+                                <Button
+                                    variant="default"
+                                    onClick={() => setShowFinalrundeDialog(true)}
+                                >
+                                    Zur Finalrunde fortfahren
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Finalrunde starten</DialogTitle>
+                                </DialogHeader>
+                                <div className="flex flex-col gap-4 mt-2">
+                                    <p>Bitte bestätigen Sie, dass alle Vorrundenspiele korrekt ausgefüllt sind.</p>
+                                    <label className="font-medium">Startzeit der Finalrunde
+                                        <input
+                                            type="time"
+                                            className="border rounded px-2 py-1 mt-1"
+                                            value={finalrundeStartTime}
+                                            onChange={e => setFinalrundeStartTime(e.target.value)}
+                                        />
+                                    </label>
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => setShowFinalrundeDialog(false)} disabled={savingGames}>Abbrechen</Button>
+                                    <Button onClick={handleCreateFinalrunde} disabled={savingGames}>{savingGames ? "Erstellen..." : "Bestätigen"}</Button>
                                 </DialogFooter>
                                 {gameError && <p className="text-red-500 text-sm mt-2">{gameError}</p>}
                                 {gameSuccess && <p className="text-green-600 text-sm mt-2">{gameSuccess}</p>}
@@ -314,6 +615,9 @@ export default function CupDetails() {
                 </TabsContent>
                 <TabsContent value="vorrunde">
                     <VorrundeTabContent cupId={typeof cupId === 'string' ? cupId : ''} />
+                </TabsContent>
+                <TabsContent value="finalrunde">
+                    <FinalrundeTabContent cupId={typeof cupId === 'string' ? cupId : ''} />
                 </TabsContent>
                 {/* Add more TabsContent for other tabs as needed */}
             </Tabs>
