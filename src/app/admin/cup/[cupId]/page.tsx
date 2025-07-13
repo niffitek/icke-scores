@@ -16,11 +16,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import TeamsTabContent from "./TeamsTabContent";
 import VorrundeTabContent from "./VorrundeTabContent";
 import FinalrundeTabContent from "./FinalrundeTabContent";
+import AuswertungTabContent from "./AuswertungTabContent";
 
 const STATE_OPTIONS = [
     "Bevorstehend",
     "Vorrunde",
-    "Endrunde",
+    "Finalrunde",
     "Abgeschlossen"
 ];
 
@@ -54,6 +55,7 @@ export default function CupDetails() {
     const [tournaments, setTournaments] = useState<any[]>([]);
     const [showFinalrundeDialog, setShowFinalrundeDialog] = useState(false);
     const [finalrundeStartTime, setFinalrundeStartTime] = useState("13:30");
+    const [showCloseTournamentDialog, setShowCloseTournamentDialog] = useState(false);
 
     useEffect(() => {
         api.get(`?path=cups`).then(res => {
@@ -477,6 +479,157 @@ export default function CupDetails() {
         }
     };
 
+    // Evaluation logic for Finalrunde
+    const handleEvaluateFinalrunde = async () => {
+        setSavingGames(true);
+        setGameError("");
+        setGameSuccess("");
+        try {
+            const token = localStorage.getItem("adminToken");
+            // 1. Get all Vorrunde and Finalrunde games
+            const gamesRes = await api.get(`?path=games`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const vorrundeGames = gamesRes.data.filter((g: any) => g.round === 'Vorrunde');
+            const finalrundeGames = gamesRes.data.filter((g: any) => g.round === 'Finalrunde');
+            // 2. Get all teams
+            const teamsRes = await api.get(`?path=teams`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const allTeams = teamsRes.data.filter((t: any) => t.icke_cup_id === cupId);
+            // 3. Get all groups and group_teams for Finalrunde
+            const groupsRes = await api.get(`?path=groups`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const groupTeamsRes = await api.get(`?path=group_teams`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const finalGroups = groupsRes.data.filter((g: any) => ['E','F','G','H'].includes(g.name));
+            const groupTeams = groupTeamsRes.data;
+            // 4. Reconstruct Vorrunde ranking (same as in handleCreateFinalrunde)
+            const teamStats: Record<string, any> = {};
+            allTeams.forEach((team: any) => {
+                teamStats[team.id] = {
+                    id: team.id,
+                    name: team.name,
+                    contact: team.contact,
+                    roundsWon: 0,
+                    totalPoints: 0,
+                    gamesPlayed: 0
+                };
+            });
+            vorrundeGames.forEach((game: any) => {
+                const team1Stats = teamStats[game.team_1_id];
+                const team2Stats = teamStats[game.team_2_id];
+                if (team1Stats && team2Stats) {
+                    team1Stats.gamesPlayed++;
+                    team2Stats.gamesPlayed++;
+                    const round1Team1Won = game.round1_winner === game.team_1_id;
+                    const round2Team1Won = game.round2_winner === game.team_1_id;
+                    const round1Team2Won = game.round1_winner === game.team_2_id;
+                    const round2Team2Won = game.round2_winner === game.team_2_id;
+                    if (round1Team1Won) team1Stats.roundsWon++;
+                    if (round2Team1Won) team1Stats.roundsWon++;
+                    if (round1Team2Won) team2Stats.roundsWon++;
+                    if (round2Team2Won) team2Stats.roundsWon++;
+                    team1Stats.totalPoints += (parseInt(game.round1_points_team_1) || 0) + (parseInt(game.round2_points_team_1) || 0);
+                    team2Stats.totalPoints += (parseInt(game.round1_points_team_2) || 0) + (parseInt(game.round2_points_team_2) || 0);
+                }
+            });
+            // Vorrunde ranking
+            const vorrundeRanking = Object.values(teamStats)
+                .sort((a: any, b: any) => {
+                    if (a.roundsWon !== b.roundsWon) return b.roundsWon - a.roundsWon;
+                    if (a.totalPoints !== b.totalPoints) return b.totalPoints - a.totalPoints;
+                    return 0;
+                });
+            // Vorrunde group mapping
+            const vorrundeGroups: Record<string, string> = {};
+            vorrundeRanking.forEach((team: any, idx: number) => {
+                if (idx < 4) vorrundeGroups[team.id] = 'E';
+                else if (idx < 8) vorrundeGroups[team.id] = 'F';
+                else if (idx < 12) vorrundeGroups[team.id] = 'G';
+                else vorrundeGroups[team.id] = 'H';
+            });
+            // 5. Evaluate Finalrunde group results
+            const finalTeamStats: Record<string, any> = {};
+            allTeams.forEach((team: any) => {
+                finalTeamStats[team.id] = {
+                    id: team.id,
+                    name: team.name,
+                    contact: team.contact,
+                    roundsWon: 0,
+                    totalPoints: 0,
+                    gamesPlayed: 0
+                };
+            });
+            finalrundeGames.forEach((game: any) => {
+                const team1Stats = finalTeamStats[game.team_1_id];
+                const team2Stats = finalTeamStats[game.team_2_id];
+                if (team1Stats && team2Stats) {
+                    team1Stats.gamesPlayed++;
+                    team2Stats.gamesPlayed++;
+                    const round1Team1Won = game.round1_winner === game.team_1_id;
+                    const round2Team1Won = game.round2_winner === game.team_1_id;
+                    const round1Team2Won = game.round1_winner === game.team_2_id;
+                    const round2Team2Won = game.round2_winner === game.team_2_id;
+                    if (round1Team1Won) team1Stats.roundsWon++;
+                    if (round2Team1Won) team1Stats.roundsWon++;
+                    if (round1Team2Won) team2Stats.roundsWon++;
+                    if (round2Team2Won) team2Stats.roundsWon++;
+                    team1Stats.totalPoints += (parseInt(game.round1_points_team_1) || 0) + (parseInt(game.round2_points_team_1) || 0);
+                    team2Stats.totalPoints += (parseInt(game.round1_points_team_2) || 0) + (parseInt(game.round2_points_team_2) || 0);
+                }
+            });
+            // 6. For each group, sort by Finalrunde performance and assign final_place offset
+            const groupOffsets = { E: 0, F: 4, G: 8, H: 12 };
+            const finalPlaceUpdates: any[] = [];
+            (['E','F','G','H'] as (keyof typeof groupOffsets)[]).forEach((groupName) => {
+                // Get all team ids in this group (from Vorrunde mapping)
+                const groupTeamIds = Object.entries(vorrundeGroups)
+                    .filter(([teamId, g]) => g === groupName)
+                    .map(([teamId]) => teamId);
+                // Get stats for these teams
+                const groupStats = groupTeamIds.map(id => finalTeamStats[id]);
+                // Sort by Finalrunde performance
+                groupStats.sort((a: any, b: any) => {
+                    if (a.roundsWon !== b.roundsWon) return b.roundsWon - a.roundsWon;
+                    if (a.totalPoints !== b.totalPoints) return b.totalPoints - a.totalPoints;
+                    return 0;
+                });
+                // Assign final_place
+                groupStats.forEach((team: any, idx: number) => {
+                    const dbTeam = allTeams.find((t: any) => t.id === team.id);
+                    finalPlaceUpdates.push({
+                        id: team.id,
+                        name: dbTeam?.name || team.name,
+                        contact: dbTeam?.contact || team.contact,
+                        final_place: groupOffsets[groupName] + idx + 1
+                    });
+                });
+            });
+            // 7. Update all teams with their final_place
+            await Promise.all(finalPlaceUpdates.map(team =>
+                api.put(`?path=teams`, team, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                })
+            ));
+            // 8. Update cup status to 'Abgeschlossen'
+            await api.put(`?path=cups`, { ...cup, state: "Abgeschlossen" }, { headers: { "Authorization": `Bearer ${token}` } });
+            setGameSuccess("Turnier abgeschlossen und Platzierungen gespeichert!");
+            // Refresh cup data
+            api.get(`?path=cups`).then(res => {
+                const cups = res.data;
+                setCup(cups.find((c: any) => c.id === cupId));
+            });
+        } catch (e) {
+            setGameError("Fehler bei der Auswertung der Finalrunde.");
+            console.error(e);
+        } finally {
+            setSavingGames(false);
+        }
+    };
+
     if (!cup || !editCup) return <div>Lade Cup...</div>;
 
     return (
@@ -558,6 +711,25 @@ export default function CupDetails() {
                             </DialogContent>
                         </Dialog>
                     )}
+                    {cup.state === "Finalrunde" && (
+                        <Dialog open={showCloseTournamentDialog} onOpenChange={setShowCloseTournamentDialog}>
+                            <DialogTrigger asChild>
+                                <Button variant="destructive" onClick={() => setShowCloseTournamentDialog(true)}>
+                                    Turnier abschließen
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Turnier abschließen</DialogTitle>
+                                </DialogHeader>
+                                <div className="py-4">Sind Sie sicher, dass Sie zur Auswertung fortfahren möchten? Diese Aktion kann nicht rückgängig gemacht werden.</div>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => setShowCloseTournamentDialog(false)}>Abbrechen</Button>
+                                    <Button variant="destructive" onClick={async () => { setShowCloseTournamentDialog(false); await handleEvaluateFinalrunde(); }}>Zur Auswertung</Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    )}
                     {!editing && <Button onClick={handleEdit}>Bearbeiten</Button>}
                 </div>
             </div>
@@ -618,6 +790,9 @@ export default function CupDetails() {
                 </TabsContent>
                 <TabsContent value="finalrunde">
                     <FinalrundeTabContent cupId={typeof cupId === 'string' ? cupId : ''} />
+                </TabsContent>
+                <TabsContent value="auswertung">
+                    <AuswertungTabContent cupId={typeof cupId === 'string' ? cupId : ''} teams={teams} />
                 </TabsContent>
                 {/* Add more TabsContent for other tabs as needed */}
             </Tabs>

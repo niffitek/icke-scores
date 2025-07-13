@@ -43,15 +43,12 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
                 const totalPointsTeam1 = (parseInt(g.round1_points_team_1, 10) || 0) + (parseInt(g.round2_points_team_1, 10) || 0);
                 const totalPointsTeam2 = (parseInt(g.round1_points_team_2, 10) || 0) + (parseInt(g.round2_points_team_2, 10) || 0);
                 
-                // Determine game winner (best of 2 rounds)
+                // Determine game winner (use Vorrunde logic: draw if points equal, else higher points wins)
                 let gameWinner = null;
-                if (round1Won !== null && round2Won !== null) {
-                    if (round1Won === round2Won) {
-                        gameWinner = round1Won === 1 ? g.team_1_id : g.team_2_id;
-                    } else {
-                        // If rounds are split, use total points as tiebreaker
-                        gameWinner = totalPointsTeam1 > totalPointsTeam2 ? g.team_1_id : g.team_2_id;
-                    }
+                if (totalPointsTeam1 === totalPointsTeam2) {
+                    gameWinner = null;
+                } else {
+                    gameWinner = totalPointsTeam1 > totalPointsTeam2 ? g.team_1_id : g.team_2_id;
                 }
                 
                 return {
@@ -161,12 +158,10 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
                 const totalPointsTeam2 = (parseInt(g.round1_points_team_2, 10) || 0) + (parseInt(g.round2_points_team_2, 10) || 0);
                 
                 let gameWinner = null;
-                if (round1Won !== null && round2Won !== null) {
-                    if (round1Won === round2Won) {
-                        gameWinner = round1Won === 1 ? g.team_1_id : g.team_2_id;
-                    } else {
-                        gameWinner = totalPointsTeam1 > totalPointsTeam2 ? g.team_1_id : g.team_2_id;
-                    }
+                if (totalPointsTeam1 === totalPointsTeam2) {
+                    gameWinner = null;
+                } else {
+                    gameWinner = totalPointsTeam1 > totalPointsTeam2 ? g.team_1_id : g.team_2_id;
                 }
                 
                 return {
