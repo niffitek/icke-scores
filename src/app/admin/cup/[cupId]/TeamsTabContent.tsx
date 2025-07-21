@@ -7,7 +7,15 @@ import { FaPen, FaTrash } from "react-icons/fa";
 import { v4 as uuidv4 } from 'uuid';
 import api from "@/lib/api";
 
-export default function TeamsTabContent({ cupId, cup }: { cupId: string, cup: any }) {
+export default function TeamsTabContent({ 
+    cupId, 
+    cup, 
+    onTeamsChange 
+}: { 
+    cupId: string; 
+    cup: any; 
+    onTeamsChange?: () => void; 
+}) {
     const [teams, setTeams] = useState<any[]>([]);
     const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [newTeam, setNewTeam] = useState({ name: '', contact: '' });
@@ -83,9 +91,11 @@ export default function TeamsTabContent({ cupId, cup }: { cupId: string, cup: an
                 }
             }
             setShowEditDialog(false);
+            setEditTeam(null);
             // Refresh teams and groupTeams
             api.get(`?path=teams`).then(res => setTeams(res.data));
             api.get(`?path=group_teams`).then(res => setGroupTeams(res.data));
+            onTeamsChange?.();
         } catch (e) {
             setTeamEditError("Fehler beim Speichern des Teams");
         } finally {
@@ -105,6 +115,7 @@ export default function TeamsTabContent({ cupId, cup }: { cupId: string, cup: an
             });
             // Refresh teams
             api.get(`?path=teams`).then(res => setTeams(res.data));
+            onTeamsChange?.();
         } catch (e) {
             alert("Fehler beim Löschen des Teams");
         } finally {
@@ -148,6 +159,7 @@ export default function TeamsTabContent({ cupId, cup }: { cupId: string, cup: an
             // Refresh teams and groupTeams
             api.get(`?path=teams`).then(res => setTeams(res.data));
             api.get(`?path=group_teams`).then(res => setGroupTeams(res.data));
+            onTeamsChange?.();
         } catch (e) {
             setCreateError("Fehler beim Anlegen des Teams");
         } finally {
@@ -274,4 +286,4 @@ export default function TeamsTabContent({ cupId, cup }: { cupId: string, cup: an
             </Table>
         </>
     );
-} 
+}
