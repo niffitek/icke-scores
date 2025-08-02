@@ -58,15 +58,23 @@ export default function CupDetails() {
     const [finalrundeStartTime, setFinalrundeStartTime] = useState("13:30");
     const [showCloseTournamentDialog, setShowCloseTournamentDialog] = useState(false);
 
+    // Function to refresh teams data
+    const refreshTeams = async () => {
+        try {
+            const res = await api.get(`?path=teams`);
+            setTeams(res.data.filter((t: any) => t.icke_cup_id === cupId));
+        } catch (error) {
+            console.error('Error refreshing teams:', error);
+        }
+    };
+
     useEffect(() => {
         api.get(`?path=cups`).then(res => {
             const cups = res.data;
             setCup(cups.find((c: any) => c.id === cupId));
         });
         // Fetch teams for this cup
-        api.get(`?path=teams`).then(res => {
-            setTeams(res.data.filter((t: any) => t.icke_cup_id === cupId));
-        });
+        refreshTeams();
         // Fetch groups and group_teams
         api.get(`?path=groups`).then(res => setGroups(res.data));
         api.get(`?path=group_teams`).then(res => setGroupTeams(res.data));
@@ -760,7 +768,11 @@ export default function CupDetails() {
                     <TabsTrigger value="auswertung">Auswertung</TabsTrigger>
                 </TabsList>
                 <TabsContent value="teams">
-                    <TeamsTabContent cupId={typeof cupId === 'string' ? cupId : ''} cup={cup} />
+                    <TeamsTabContent 
+                        cupId={typeof cupId === 'string' ? cupId : ''} 
+                        cup={cup} 
+                        onTeamsChange={refreshTeams}
+                    />
                 </TabsContent>
                 <TabsContent value="vorrunde">
                     <VorrundeTabContent cupId={typeof cupId === 'string' ? cupId : ''} />
@@ -771,10 +783,7 @@ export default function CupDetails() {
                 <TabsContent value="auswertung">
                     <AuswertungTabContent cupId={typeof cupId === 'string' ? cupId : ''} teams={teams} />
                 </TabsContent>
-                {/* Add more TabsContent for other tabs as needed */}
             </Tabs>
-            {/* Step 1: Proceed to Vorrunde button */}
-            
         </div>
     );
 }

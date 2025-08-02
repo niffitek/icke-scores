@@ -1,11 +1,15 @@
 import axios from 'axios';
 
-// This will only work on the client
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+});
+
+// Set up interceptor only on client side
 if (typeof window !== 'undefined') {
-  axios.interceptors.response.use(
+  api.interceptors.response.use(
     response => response,
     error => {
-        console.log(error);
+      console.log(error);
       if (error.response && error.response.status === 401) {
         window.location.href = '/admin/login';
       }
@@ -14,8 +18,4 @@ if (typeof window !== 'undefined') {
   );
 }
 
-const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
-});
-
-export default api; 
+export default api;

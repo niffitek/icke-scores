@@ -27,22 +27,34 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
                 headers: {
                     "Authorization": `Bearer ${token}`,
                 },
+            }),
+            api.get(`?path=tournaments`, {
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                },
             })
-        ]).then(([gamesRes, teamsRes]) => {
+        ]).then(([gamesRes, teamsRes, tournamentsRes]) => {
             const teams = teamsRes.data.filter((t: any) => t.icke_cup_id === cupId);
             const teamMap = Object.fromEntries(teams.map((t: any) => [t.id, t.name]));
-            // Filter by cupId and Finalrunde
-            const filtered = gamesRes.data.filter((g: any) => g.round === 'Finalrunde');
+
+            // Filter tournaments for this cup
+            const cupTournaments = tournamentsRes.data.filter((t: any) => t.icke_cup_id === cupId);
+            const cupTournamentIds = cupTournaments.map((t: any) => t.id);
+
+            // Filter by cupId (through tournaments) and Finalrunde
+            const filtered = gamesRes.data.filter((g: any) =>
+                g.round === 'Finalrunde' && cupTournamentIds.includes(g.tournament_id)
+            );
 
             // Map team IDs to names and calculate game results
             const mapped = filtered.map((g: any) => {
                 const round1Won = g.round1_winner === g.team_1_id ? 1 : g.round1_winner === g.team_2_id ? 0 : null;
                 const round2Won = g.round2_winner === g.team_1_id ? 1 : g.round2_winner === g.team_2_id ? 0 : null;
-                
+
                 // Calculate total points
                 const totalPointsTeam1 = (parseInt(g.round1_points_team_1, 10) || 0) + (parseInt(g.round2_points_team_1, 10) || 0);
                 const totalPointsTeam2 = (parseInt(g.round1_points_team_2, 10) || 0) + (parseInt(g.round2_points_team_2, 10) || 0);
-                
+
                 // Determine game winner (use Vorrunde logic: draw if points equal, else higher points wins)
                 let gameWinner = null;
                 if (totalPointsTeam1 === totalPointsTeam2) {
@@ -50,7 +62,7 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
                 } else {
                     gameWinner = totalPointsTeam1 > totalPointsTeam2 ? g.team_1_id : g.team_2_id;
                 }
-                
+
                 return {
                     ...g,
                     teamA: teamMap[g.team_1_id] || g.team_1_id,
@@ -94,11 +106,11 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
 
     const handleSaveGame = async () => {
         if (!editGame) return;
-        
+
         setSaving(true);
         try {
             const token = localStorage.getItem("adminToken");
-            
+
             // Get the rounds for this game
             const roundsRes = await api.get(`?path=rounds&game_id=${editGame.id}`, {
                 headers: {
@@ -106,7 +118,7 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
                 },
             });
             const rounds = roundsRes.data;
-            
+
             // Update round 1
             if (rounds[0]) {
                 await api.put(`?path=rounds`, {
@@ -119,7 +131,7 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
                     },
                 });
             }
-            
+
             // Update round 2
             if (rounds[1]) {
                 await api.put(`?path=rounds`, {
@@ -132,38 +144,53 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
                     },
                 });
             }
-            
+
             setShowEditDialog(false);
             setEditGame(null);
-            
+
             // Refresh games data
-            const gamesRes = await api.get(`?path=games`, {
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                },
-            });
-            const teamsRes = await api.get(`?path=teams`, {
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                },
-            });
+            const [gamesRes, teamsRes, tournamentsRes] = await Promise.all([
+                api.get(`?path=games`, {
+                    headers: {
+                        "Authorization": `Bearer ${token}`,
+                    },
+                }),
+                api.get(`?path=teams`, {
+                    headers: {
+                        "Authorization": `Bearer ${token}`,
+                    },
+                }),
+                api.get(`?path=tournaments`, {
+                    headers: {
+                        "Authorization": `Bearer ${token}`,
+                    },
+                })
+            ]);
+
             const teams = teamsRes.data.filter((t: any) => t.icke_cup_id === cupId);
             const teamMap = Object.fromEntries(teams.map((t: any) => [t.id, t.name]));
-            const filtered = gamesRes.data.filter((g: any) => g.round === 'Finalrunde');
-            
+
+            // Filter tournaments for this cup
+            const cupTournaments = tournamentsRes.data.filter((t: any) => t.icke_cup_id === cupId);
+            const cupTournamentIds = cupTournaments.map((t: any) => t.id);
+
+            const filtered = gamesRes.data.filter((g: any) =>
+                g.round === 'Finalrunde' && cupTournamentIds.includes(g.tournament_id)
+            );
+
             const mapped = filtered.map((g: any) => {
                 const round1Won = g.round1_winner === g.team_1_id ? 1 : g.round1_winner === g.team_2_id ? 0 : null;
                 const round2Won = g.round2_winner === g.team_1_id ? 1 : g.round2_winner === g.team_2_id ? 0 : null;
                 const totalPointsTeam1 = (parseInt(g.round1_points_team_1, 10) || 0) + (parseInt(g.round2_points_team_1, 10) || 0);
                 const totalPointsTeam2 = (parseInt(g.round1_points_team_2, 10) || 0) + (parseInt(g.round2_points_team_2, 10) || 0);
-                
+
                 let gameWinner = null;
                 if (totalPointsTeam1 === totalPointsTeam2) {
                     gameWinner = null;
                 } else {
                     gameWinner = totalPointsTeam1 > totalPointsTeam2 ? g.team_1_id : g.team_2_id;
                 }
-                
+
                 return {
                     ...g,
                     teamA: teamMap[g.team_1_id] || g.team_1_id,
@@ -171,7 +198,7 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
                     time: g.start_at ? new Date(g.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-',
                     round1Result: `${g.round1_points_team_1 || 0} : ${g.round1_points_team_2 || 0}`,
                     round2Result: `${g.round2_points_team_1 || 0} : ${g.round2_points_team_2 || 0}`,
-                    totalResult: `${parseInt(g.round1_points_team_1, 10) + parseInt(g.round2_points_team_1, 10)} : ${parseInt(g.round1_points_team_2, 10) + parseInt(g.round2_points_team_2, 10)}`,
+                    totalResult: `${totalPointsTeam1} : ${totalPointsTeam2}`,
                     gameWinner: gameWinner ? teamMap[gameWinner] : 'Unentschieden',
                     round1Won,
                     round2Won,
@@ -204,7 +231,7 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
             <div className="flex flex-row justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">Finalrundenspiele</h2>
             </div>
-            
+
             <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
@@ -215,7 +242,7 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
                             <div className="text-center font-medium mb-2">
                                 {editGame.teamA} vs {editGame.teamB}
                             </div>
-                            
+
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium mb-2">Runde 1</label>
@@ -243,7 +270,7 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
                                         />
                                     </div>
                                 </div>
-                                
+
                                 <div>
                                     <label className="block text-sm font-medium mb-2">Runde 2</label>
                                     <div className="flex gap-2 items-center">
@@ -270,7 +297,7 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
                                         />
                                     </div>
                                 </div>
-                                
+
                                 <div className="text-center text-sm text-gray-600">
                                     Gesamt: {parseInt(editGame.round1_points_team_1, 10) + parseInt(editGame.round2_points_team_1, 10)} : {parseInt(editGame.round1_points_team_2, 10) + parseInt(editGame.round2_points_team_2, 10)}
                                 </div>
@@ -287,7 +314,7 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-            
+
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -314,9 +341,9 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
                             <TableCell>{game.totalResult}</TableCell>
                             <TableCell>{game.gameWinner}</TableCell>
                             <TableCell className="text-right">
-                                <Button 
-                                    variant="outline" 
-                                    size="icon" 
+                                <Button
+                                    variant="outline"
+                                    size="icon"
                                     className="p-2"
                                     onClick={() => handleEditGame(game)}
                                 >
@@ -329,4 +356,4 @@ export default function FinalrundeTabContent({ cupId }: { cupId: string }) {
             </Table>
         </>
     );
-} 
+}
