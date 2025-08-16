@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
+import CupsService from "@/services/cups";
+import TournamentsService from "@/services/tournaments";
+import TeamsService from "@/services/teams";
+import GamesService from "@/services/games";
 
 type TeamStats = {
   id: string;
@@ -26,52 +30,29 @@ export default function ScoresPage() {
   const fetchScores = async () => {
     try {
       setLoading(true);
-
-      // Fetch all necessary data
-      const [gamesRes, teamsRes, tournamentsRes, cupsRes] = await Promise.all([
-        api.get("?path=games"),
-        api.get("?path=teams"),
-        api.get("?path=tournaments"),
-        api.get("?path=cups"),
-      ]);
-
-      const gamesData = gamesRes.data;
-      const teamsData = teamsRes.data;
-      const tournamentsData = tournamentsRes.data;
-      const cupsData = cupsRes.data;
-
       // Filter cups that are in Vorrunde or Finalrunde state
-      const activeCups = cupsData.filter(
-        (cup: any) => cup.state === "Vorrunde" || cup.state === "Finalrunde"
-      );
-      const activeCupIds = activeCups.map((cup: any) => cup.id);
+      const activeCup = await CupsService.getActiveCup();
 
       // Filter tournaments that belong to active cups
-      const activeTournaments = tournamentsData.filter((tournament: any) =>
-        activeCupIds.includes(tournament.icke_cup_id)
-      );
-      const activeTournamentIds = activeTournaments.map(
-        (tournament: any) => tournament.id
-      );
+      const activeTournaments = await TournamentsService.getTournamentsByCupId(activeCup.id);
+      const activeTournamentIds = activeTournaments.map((tournament: any) => tournament.id);
 
       // Filter teams and games for active tournaments
-      const activeTeams = teamsData.filter((team: any) =>
-        activeCupIds.includes(team.icke_cup_id)
-      );
+      const activeTeams = await TeamsService.getTeamsByCupId(activeCup.id);
 
-      const activeGames = gamesData.filter(
+      let activeGames: any[] = [];
+      for (const tournamentId of activeTournamentIds) {
+        const games = await GamesService.getGamesByTournamentId(tournamentId);
+        activeGames = activeGames.concat(games);
+      }
+
+      const finishedGames = activeGames.filter(
         (game: any) =>
-          activeTournamentIds.includes(game.tournament_id) &&
-          // Only include games with some scores
           (game.round1_points_team_1 !== null ||
             game.round1_points_team_2 !== null ||
             game.round2_points_team_1 !== null ||
-            game.round2_points_team_2 !== null)
-      );
-
-      // Create team name mapping
-      const teamMap = Object.fromEntries(
-        activeTeams.map((team: any) => [team.id, team.name])
+            game.round2_points_team_2 !== null) &&
+          (game.round === activeCup.state)
       );
 
       // Initialize team stats
@@ -89,7 +70,7 @@ export default function ScoresPage() {
       });
 
       // Process each game
-      activeGames.forEach((game: any) => {
+      finishedGames.forEach((game: any) => {
         const team1Id = game.team_1_id;
         const team2Id = game.team_2_id;
 

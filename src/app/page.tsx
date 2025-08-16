@@ -1,7 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react";
-import api from "@/lib/api";
+import CupsService from "@/services/cups";
+import TournamentsService from "@/services/tournaments";
+import TeamsService from "@/services/teams";
+import GamesService from "@/services/games";
 
 type Game = {
   id: number;
@@ -22,18 +25,6 @@ type Game = {
   round2_winner?: string;
 };
 
-type Tournament = {
-  id: number;
-  name: string;
-  icke_cup_id: string;
-};
-
-type Cup = {
-  id: string;
-  name: string;
-  state: string;
-};
-
 export default function Home() {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,41 +34,38 @@ export default function Home() {
     try {
       setLoading(true);
       
-      // Fetch games, teams, tournaments, and cups
-      const [gamesRes, teamsRes, tournamentsRes, cupsRes] = await Promise.all([
-        api.get('?path=games'),
-        api.get('?path=teams'),
-        api.get('?path=tournaments'),
-        api.get('?path=cups')
-      ]);
-      
-      const gamesData = gamesRes.data;
-      const teamsData = teamsRes.data;
-      const tournamentsData = tournamentsRes.data;
-      const cupsData = cupsRes.data;
-      
-      // Filter cups that are in Vorrunde or Finalrunde state
-      const activeCups = cupsData.filter(
-        (cup: Cup) => cup.state === "Vorrunde" || cup.state === "Finalrunde"
-      );
-      const activeCupIds = activeCups.map((cup: Cup) => cup.id);
-      // Filter tournaments that belong to active cups
-      const activeTournaments = tournamentsData.filter((tournament: Tournament) =>
-        activeCupIds.includes(tournament.icke_cup_id)
-      );
-      const activeTournamentIds = activeTournaments.map((tournament: Tournament) => tournament.id);
+      // Get active cup
+      const activeCup = await CupsService.getActiveCup();
+      if (!activeCup) {
+        setGames([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get tournaments for the active cup
+      const activeTournaments = await TournamentsService.getTournamentsByCupId(activeCup.id);
+      const activeTournamentIds = activeTournaments.map((tournament: any) => tournament.id);
+
+      // Get all teams for the active cup
+      const teamsData = await TeamsService.getTeamsByCupId(activeCup.id);
+
+      // Get all games for active tournaments
+      let allGames: any[] = [];
+      for (const tournamentId of activeTournamentIds) {
+        const games = await GamesService.getGamesByTournamentId(tournamentId);
+        allGames = allGames.concat(games);
+      }
+
       // Create team name mapping
       const teamMap = Object.fromEntries(
         teamsData.map((team: any) => [team.id, team.name])
       );
+
       const now = new Date();
       const threeMinutesInMs = 3 * 60 * 1000;
       
-      // Filter games by active tournaments
-      const activeGames = gamesData.filter((game: Game) => activeTournamentIds.includes(game.tournament_id));
-      
       // First try "Vorrunde"
-      let currentStateGames = activeGames.filter((game: Game) => game.round === "Vorrunde");
+      let currentStateGames = allGames.filter((game: Game) => game.round === "Vorrunde");
       let activeRound = "Vorrunde";
       
       // Filter upcoming games for Vorrunde
@@ -89,7 +77,7 @@ export default function Home() {
       
       // If no upcoming Vorrunde games, switch to Finalrunde
       if (upcomingVorrunde.length === 0) {
-        currentStateGames = activeGames.filter((game: Game) => game.round === "Finalrunde");
+        currentStateGames = allGames.filter((game: Game) => game.round === "Finalrunde");
         activeRound = "Finalrunde";
       }
       

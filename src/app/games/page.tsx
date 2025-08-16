@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import api from "@/lib/api";
+import CupsService from "@/services/cups";
+import TournamentsService from "@/services/tournaments";
+import TeamsService from "@/services/teams";
+import GamesService from "@/services/games";
 
 type Game = {
   id: number;
@@ -22,18 +25,6 @@ type Game = {
   round2_winner?: string;
 };
 
-type Tournament = {
-  id: number;
-  name: string;
-  icke_cup_id: string;
-};
-
-type Cup = {
-  id: string;
-  name: string;
-  state: string;
-};
-
 export default function GamesPage() {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,73 +36,67 @@ export default function GamesPage() {
     try {
       setLoading(true);
 
-      // Fetch games, teams, tournaments, and cups
-      const [gamesRes, teamsRes, tournamentsRes, cupsRes] = await Promise.all([
-        api.get("?path=games"),
-        api.get("?path=teams"),
-        api.get("?path=tournaments"),
-        api.get("?path=cups"),
-      ]);
+      // Get active cup
+      const activeCup = await CupsService.getActiveCup();
+      if (!activeCup) {
+        setGames([]);
+        setLoading(false);
+        return;
+      }
 
-      const gamesData = gamesRes.data;
-      const teamsData = teamsRes.data;
-      const tournamentsData = tournamentsRes.data;
-      const cupsData = cupsRes.data;
+      // Get tournaments for the active cup
+      const activeTournaments = await TournamentsService.getTournamentsByCupId(activeCup.id);
+      const activeTournamentIds = activeTournaments.map((tournament: any) => tournament.id);
 
-      // Filter cups that are in Vorrunde or Finalrunde state
-      const activeCups = cupsData.filter(
-        (cup: Cup) => cup.state === "Vorrunde" || cup.state === "Finalrunde"
-      );
-      const activeCupIds = activeCups.map((cup: Cup) => cup.id);
+      // Get all teams for the active cup
+      const teamsData = await TeamsService.getTeamsByCupId(activeCup.id);
 
-      // Filter tournaments that belong to active cups
-      const activeTournaments = tournamentsData.filter((tournament: Tournament) =>
-        activeCupIds.includes(tournament.icke_cup_id)
-      );
-      const activeTournamentIds = activeTournaments.map((tournament: Tournament) => tournament.id);
+      // Get all games for active tournaments
+      let allGames: any[] = [];
+      for (const tournamentId of activeTournamentIds) {
+        const games = await GamesService.getGamesByTournamentId(tournamentId);
+        allGames = allGames.concat(games);
+      }
 
-      // Create mappings
+      // Create team name mapping
       const teamMap = Object.fromEntries(
         teamsData.map((team: any) => [team.id, team.name])
       );
 
-      // Filter games by active tournaments and add team names
-      const filteredGames = gamesData
-        .filter((game: Game) => activeTournamentIds.includes(game.tournament_id))
-        .map((game: Game) => {
-          const now = new Date();
-          const gameStart = new Date(game.start_at);
-          const threeMinutesAfter = new Date(
-            gameStart.getTime() + 3 * 60 * 1000
-          );
+      // Add team names and status to games
+      const processedGames = allGames.map((game: Game) => {
+        const now = new Date();
+        const gameStart = new Date(game.start_at);
+        const threeMinutesAfter = new Date(
+          gameStart.getTime() + 3 * 60 * 1000
+        );
 
-          let status: "upcoming" | "live" | "finished";
-          if (now < gameStart) {
-            status = "upcoming";
-          } else if (now <= threeMinutesAfter) {
-            status = "live";
-          } else {
-            status = "finished";
-          }
+        let status: "upcoming" | "live" | "finished";
+        if (now < gameStart) {
+          status = "upcoming";
+        } else if (now <= threeMinutesAfter) {
+          status = "live";
+        } else {
+          status = "finished";
+        }
 
-          return {
-            ...game,
-            team1Name: teamMap[game.team_1_id] || `Team ${game.team_1_id}`,
-            team2Name: teamMap[game.team_2_id] || `Team ${game.team_2_id}`,
-            status,
-          };
-        })
-        .sort((a: Game, b: Game) => {
-          // First sort by time
-          const timeComparison = new Date(a.start_at).getTime() - new Date(b.start_at).getTime();
-          // If same time, sort by court number
-          if (timeComparison === 0) {
-            return a.court - b.court;
-          }
-          return timeComparison;
-        });
+        return {
+          ...game,
+          team1Name: teamMap[game.team_1_id] || `Team ${game.team_1_id}`,
+          team2Name: teamMap[game.team_2_id] || `Team ${game.team_2_id}`,
+          status,
+        };
+      }).sort((a: Game, b: Game) => {
+        // First sort by time
+        const timeComparison = new Date(a.start_at).getTime() - new Date(b.start_at).getTime();
+        // If same time, sort by court number
+        if (timeComparison === 0) {
+          return a.court - b.court;
+        }
+        return timeComparison;
+      });
 
-      setGames(filteredGames);
+      setGames(processedGames);
       setLoading(false);
     } catch (error) {
       console.error("Error fetching games:", error);
@@ -121,6 +106,15 @@ export default function GamesPage() {
 
   useEffect(() => {
     fetchGames();
+  }, []);
+
+  // Refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchGames();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const filteredGames = games.filter((game) => {

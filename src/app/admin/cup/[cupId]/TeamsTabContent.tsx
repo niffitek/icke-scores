@@ -28,8 +28,8 @@ export default function TeamsTabContent({
     const [teamDeleteLoading, setTeamDeleteLoading] = useState('');
     const [tournaments, setTournaments] = useState<any[]>([]);
     const [groups, setGroups] = useState<any[]>([]);
-    const [selectedGroup, setSelectedGroup] = useState('A');
-    const [editSelectedGroup, setEditSelectedGroup] = useState('A');
+    const [selectedGroup, setSelectedGroup] = useState(cup.state === "Finalrunde" ? 'E' : 'A');
+    const [editSelectedGroup, setEditSelectedGroup] = useState(cup.state === "Finalrunde" ? 'E' : 'A');
     const [groupTeams, setGroupTeams] = useState<any[]>([]);
 
     useEffect(() => {
@@ -49,11 +49,25 @@ export default function TeamsTabContent({
     }, [cupId]);
 
     const getTeamGroupName = (teamId: string) => {
-        // Find the group assignment for this team in the first tournament
-        const gt = groupTeams.find((gt: any) => gt.team_id === teamId);
-        if (!gt) return '-';
-        const group = groups.find((g: any) => g.id === gt.group_id);
-        return group ? group.name : '-';
+        // Get all group assignments for this team
+        const teamGroupAssignments = groupTeams.filter((gt: any) => gt.team_id === teamId);
+        if (teamGroupAssignments.length === 0) return '-';
+        
+        // Determine which groups are relevant based on cup state
+        const relevantGroups = cup.state === "Finalrunde" ? ['E','F','G','H'] : ['A','B','C','D'];
+        
+        // Find a group assignment that matches the relevant groups
+        for (const gt of teamGroupAssignments) {
+            const group = groups.find((g: any) => g.id === gt.group_id);
+            if (group && relevantGroups.includes(group.name)) {
+                return group.name;
+            }
+        }
+        
+        // If no relevant group found, return the first group name (fallback)
+        const firstGt = teamGroupAssignments[0];
+        const firstGroup = groups.find((g: any) => g.id === firstGt.group_id);
+        return firstGroup ? firstGroup.name : '-';
     };
 
     const handleSaveTeam = async () => {
@@ -194,7 +208,7 @@ export default function TeamsTabContent({
                             />
                             <label className="font-medium">Gruppe
                                 <select className="border rounded px-2 py-1 mt-1" value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)}>
-                                    {['A','B','C','D'].map(g => <option key={g} value={g}>{g}</option>)}
+                                    {(cup.state === "Finalrunde" ? ['E','F','G','H'] : ['A','B','C','D']).map(g => <option key={g} value={g}>{g}</option>)}
                                 </select>
                             </label>
                             {createError && <p className="text-red-500 text-sm">{createError}</p>}
@@ -219,8 +233,22 @@ export default function TeamsTabContent({
                 <TableBody>
                     {teams
                         .filter((t: any) => t.icke_cup_id === cup.id)
+                        .filter((t: any) => {
+                            const teamGroupAssignments = groupTeams.filter((gt: any) => gt.team_id === t.id);
+                            if (teamGroupAssignments.length === 0) return true; // Show unassigned teams
+                            
+                            const relevantGroups = cup.state === "Finalrunde" ? ['E','F','G','H'] : ['A','B','C','D'];
+                            
+                            // Show team if it has at least one assignment in the relevant groups
+                            return teamGroupAssignments.some((gt: any) => {
+                                const group = groups.find((g: any) => g.id === gt.group_id);
+                                return group && relevantGroups.includes(group.name);
+                            });
+                        })
                         .sort((a: any, b: any) => {
-                            const groupOrder: Record<string, number> = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
+                            const groupOrder: Record<string, number> = cup.state === "Finalrunde" 
+                                ? { 'E': 0, 'F': 1, 'G': 2, 'H': 3 }
+                                : { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
                             const groupA = getTeamGroupName(a.id);
                             const groupB = getTeamGroupName(b.id);
                             const orderA = groupOrder[groupA] !== undefined ? groupOrder[groupA] : 99;
@@ -236,7 +264,12 @@ export default function TeamsTabContent({
                                 <TableCell className="text-right">
                                     <Dialog open={showEditDialog && editTeam?.id === team.id} onOpenChange={open => { if (!open) setShowEditDialog(false); }}>
                                         <DialogTrigger asChild>
-                                            <Button variant="outline" size="icon" className="p-2 mr-2" onClick={() => { setEditTeam({ ...team }); setShowEditDialog(true); setTeamEditError(""); }}>
+                                            <Button variant="outline" size="icon" className="p-2 mr-2" onClick={() => { 
+                                                setEditTeam({ ...team }); 
+                                                setEditSelectedGroup(getTeamGroupName(team.id) || (cup.state === "Finalrunde" ? 'E' : 'A')); 
+                                                setShowEditDialog(true); 
+                                                setTeamEditError(""); 
+                                            }}>
                                                 <FaPen />
                                             </Button>
                                         </DialogTrigger>
@@ -257,7 +290,7 @@ export default function TeamsTabContent({
                                                 />
                                                 <label className="font-medium">Gruppe
                                                     <select className="border rounded px-2 py-1 mt-1" value={editSelectedGroup} onChange={e => setEditSelectedGroup(e.target.value)}>
-                                                        {['A','B','C','D'].map(g => <option key={g} value={g}>{g}</option>)}
+                                                        {(cup.state === "Finalrunde" ? ['E','F','G','H'] : ['A','B','C','D']).map(g => <option key={g} value={g}>{g}</option>)}
                                                     </select>
                                                 </label>
                                                 {teamEditError && <p className="text-red-500 text-sm">{teamEditError}</p>}
