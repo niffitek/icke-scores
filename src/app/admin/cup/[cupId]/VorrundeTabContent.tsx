@@ -27,23 +27,14 @@ export default function VorrundeTabContent({ cupId }: { cupId: string }) {
                 headers: {
                     "Authorization": `Bearer ${token}`,
                 },
-            }),
-            api.get(`?path=tournaments`, {
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                },
             })
-        ]).then(([gamesRes, teamsRes, tournamentsRes]) => {
+        ]).then(([gamesRes, teamsRes]) => {
             const teams = teamsRes.data.filter((t: any) => t.icke_cup_id === cupId);
             const teamMap = Object.fromEntries(teams.map((t: any) => [t.id, t.name]));
 
-            // Filter tournaments for this cup
-            const cupTournaments = tournamentsRes.data.filter((t: any) => t.icke_cup_id === cupId);
-            const cupTournamentIds = cupTournaments.map((t: any) => t.id);
-
-            // Filter by cupId (through tournaments) and Vorrunde
+            // Filter by cupId and Vorrunde
             const filtered = gamesRes.data.filter((g: any) =>
-                g.round === 'Vorrunde' && cupTournamentIds.includes(g.tournament_id)
+                g.round === 'Vorrunde' && g.icke_cup_id === cupId
             );
 
             // Map team IDs to names and calculate game results
@@ -149,7 +140,7 @@ export default function VorrundeTabContent({ cupId }: { cupId: string }) {
             setEditGame(null);
 
             // Refresh games data
-            const [gamesRes, teamsRes, tournamentsRes] = await Promise.all([
+            const [gamesRes, teamsRes] = await Promise.all([
                 api.get(`?path=games`, {
                     headers: {
                         "Authorization": `Bearer ${token}`,
@@ -159,23 +150,14 @@ export default function VorrundeTabContent({ cupId }: { cupId: string }) {
                     headers: {
                         "Authorization": `Bearer ${token}`,
                     },
-                }),
-                api.get(`?path=tournaments`, {
-                    headers: {
-                        "Authorization": `Bearer ${token}`,
-                    },
                 })
             ]);
 
             const teams = teamsRes.data.filter((t: any) => t.icke_cup_id === cupId);
             const teamMap = Object.fromEntries(teams.map((t: any) => [t.id, t.name]));
 
-            // Filter tournaments for this cup
-            const cupTournaments = tournamentsRes.data.filter((t: any) => t.icke_cup_id === cupId);
-            const cupTournamentIds = cupTournaments.map((t: any) => t.id);
-
             const filtered = gamesRes.data.filter((g: any) =>
-                g.round === 'Vorrunde' && cupTournamentIds.includes(g.tournament_id)
+                g.round === 'Vorrunde' && g.icke_cup_id === cupId
             );
 
             const mapped = filtered.map((g: any) => {

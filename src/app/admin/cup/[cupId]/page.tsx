@@ -20,8 +20,9 @@ import CupsService from "@/services/cups";
 import TeamsService from "@/services/teams";
 import GroupsService from "@/services/groups";
 import GroupTeamsService from "@/services/groupTeams";
-import TournamentsService from "@/services/tournaments";
+
 import GamesService from "@/services/games";
+import RankingService from "@/services/ranking";
 
 
 export default function CupDetails() {
@@ -43,7 +44,7 @@ export default function CupDetails() {
     const [gameSuccess, setGameSuccess] = useState("");
     const [groups, setGroups] = useState<any[]>([]);
     const [groupTeams, setGroupTeams] = useState<any[]>([]);
-    const [tournaments, setTournaments] = useState<any[]>([]);
+
     const [showFinalrundeDialog, setShowFinalrundeDialog] = useState(false);
     const [finalrundeStartTime, setFinalrundeStartTime] = useState("13:30");
     const [showCloseTournamentDialog, setShowCloseTournamentDialog] = useState(false);
@@ -67,9 +68,7 @@ export default function CupDetails() {
         // Fetch groups and group_teams
         GroupsService.getGroups().then(res => setGroups(res));
         GroupTeamsService.getGroupTeams().then(res => setGroupTeams(res));
-        TournamentsService.getTournamentsByCupId(cupId as string).then(res => {
-            setTournaments(res);
-        });
+
     }, [cupId]);
 
     useEffect(() => {
@@ -157,8 +156,6 @@ export default function CupDetails() {
                     const team1Id = COURT_TYPE[court] ? getSittingTeamId(groupL, numL) : getStandingTeamId(groupL, numL);
                     const team2Id = COURT_TYPE[court] ? getSittingTeamId(groupR, numR) : getStandingTeamId(groupR, numR);
                     if (!team1Id || !team2Id) continue; // skip if mapping fails
-                    const sittingTournament = tournaments.find(t => t.sitting === '1');
-                    const standingTournament = tournaments.find(t => t.sitting === '0');
                     const pad = (n: number) => n.toString().padStart(2, '0');
                     const localDateString = `${roundTime.getFullYear()}-${pad(roundTime.getMonth() + 1)}-${pad(roundTime.getDate())}T${pad(roundTime.getHours())}:${pad(roundTime.getMinutes())}:00`;
                     games.push({
@@ -169,7 +166,7 @@ export default function CupDetails() {
                         points_team_1: 0,
                         points_team_2: 0,
                         start_at: localDateString,
-                        tournament_id: COURT_TYPE[court] ? sittingTournament?.id : standingTournament?.id,
+                        icke_cup_id: cupId,
                         round: "Vorrunde",
                         sitting: COURT_TYPE[court] ? 1 : 0,
                         court: court + 1
@@ -201,182 +198,31 @@ export default function CupDetails() {
         try {
 
             // 1. Get all Vorrunde games with their results
-            const gamesRes = [];
-            for (const tournament of tournaments) {
-                const games = await GamesService.getGamesByTournamentId(tournament.id);
-                gamesRes.push(...games);
-            }
-            const vorrundeGames = gamesRes.filter((g: any) => g.round === 'Vorrunde');
+            const allGames = await GamesService.getGamesByCupId(cupId as string);
+            const vorrundeGames = allGames.filter((g: any) => g.round === 'Vorrunde');
             
             // 2. Get all teams
             const teamsRes = await TeamsService.getTeamsByCupId(cupId as string);
             const allTeams = teamsRes.filter((t: any) => t.icke_cup_id === cupId);
             
-            // 3. Evaluate games and calculate team performance
-            const teamStats: Record<string, any> = {};
-            allTeams.forEach((team: any) => {
-                teamStats[team.id] = {
-                    id: team.id,
-                    name: team.name,
-                    group: groupTeams.find((gt: any) => gt.team_id === team.id)?.group_id,
-                    roundsWonSitting: 0,
-                    roundsWonStanding: 0,
-                    totalPointsSitting: 0,
-                    totalPointsStanding: 0,
-                    totalPointsAgainstSitting: 0,
-                    totalPointsAgainstStanding: 0,
-                    finalScore: 0,
-                };
-            });
+            let teamStats: Record<string, any> = RankingService.getAllTeamStats(allTeams, groupTeams);
             
-            // Calculate stats for each team
-            vorrundeGames.forEach((game: any) => {
-                const team1Stats = teamStats[game.team_1_id];
-                const team2Stats = teamStats[game.team_2_id];
-                
-                if (team1Stats && team2Stats) {
-                    // Calculate rounds won and total points
-                    const round1Team1Won = game.round1_winner === game.team_1_id;
-                    const round2Team1Won = game.round2_winner === game.team_1_id;
-                    const round1Team2Won = game.round1_winner === game.team_2_id;
-                    const round2Team2Won = game.round2_winner === game.team_2_id;
+            // 4. Get all groups for this cup and evaluate each group
+            const cupGroups = await GroupsService.getGroupsByCupId(cupId as string);
 
-                    if (game.sitting === '1') {
-                        if (round1Team1Won) team1Stats.roundsWonSitting++;
-                        if (round2Team1Won) team1Stats.roundsWonSitting++;
-                        if (round1Team2Won) team2Stats.roundsWonSitting++;
-                        if (round2Team2Won) team2Stats.roundsWonSitting++;
+            teamStats = RankingService.fillAllTeamStats(teamStats, vorrundeGames, cupGroups, groupTeams);
 
-                        team1Stats.totalPointsSitting += (parseInt(game.round1_points_team_1, 10) || 0) + (parseInt(game.round2_points_team_1, 10) || 0);
-                        team2Stats.totalPointsSitting += (parseInt(game.round1_points_team_2, 10) || 0) + (parseInt(game.round2_points_team_2, 10) || 0);
-                        
-                        team1Stats.totalPointsAgainstSitting += (parseInt(game.round1_points_team_2, 10) || 0) + (parseInt(game.round2_points_team_2, 10) || 0);
-                        team2Stats.totalPointsAgainstSitting += (parseInt(game.round1_points_team_1, 10) || 0) + (parseInt(game.round2_points_team_1, 10) || 0);
-                    } else if (game.sitting === '0') {
-                        if (round1Team1Won) team1Stats.roundsWonStanding++;
-                        if (round2Team1Won) team1Stats.roundsWonStanding++;
-                        if (round1Team2Won) team2Stats.roundsWonStanding++;
-                        if (round2Team2Won) team2Stats.roundsWonStanding++;
-
-                        team1Stats.totalPointsStanding += (parseInt(game.round1_points_team_1, 10) || 0) + (parseInt(game.round2_points_team_1, 10) || 0);
-                        team2Stats.totalPointsStanding += (parseInt(game.round1_points_team_2, 10) || 0) + (parseInt(game.round2_points_team_2, 10) || 0);
-                        
-                        team1Stats.totalPointsAgainstStanding += (parseInt(game.round1_points_team_2, 10) || 0) + (parseInt(game.round2_points_team_2, 10) || 0);
-                        team2Stats.totalPointsAgainstStanding += (parseInt(game.round1_points_team_1, 10) || 0) + (parseInt(game.round2_points_team_1, 10) || 0);
-                    }
-                }
-            });
-            
-            // 4. Group teams by tournament and evaluate each group
-            const sittingTournament = tournaments.find(t => t.sitting === '1');
-            const standingTournament = tournaments.find(t => t.sitting === '0');
-            
-            // Get groups for each tournament
-            const sittingGroups = groups.filter(g => g.tournament_id === sittingTournament?.id);
-            const standingGroups = groups.filter(g => g.tournament_id === standingTournament?.id);
-            
-            // Evaluate sitting tournament groups
-            const sittingGroupResults: Record<string, any[]> = {};
-            sittingGroups.forEach(group => {
-                const groupTeamAssignments = groupTeams.filter((gt: any) => gt.group_id === group.id)
-                    .map((gt: any) => teamStats[gt.team_id])
-                    .filter(Boolean);
-                
-                // Sort by rounds won, then by point difference
-                groupTeamAssignments.sort((a: any, b: any) => {
-                    if (a.roundsWonSitting !== b.roundsWonSitting) return b.roundsWonSitting - a.roundsWonSitting;
-                    const pointDiffA = a.totalPointsSitting - a.totalPointsAgainstSitting;
-                    const pointDiffB = b.totalPointsSitting - b.totalPointsAgainstSitting;
-                    if (pointDiffA !== pointDiffB) return pointDiffB - pointDiffA;
-                    return 0; // Could add head-to-head comparison here
-                });
-
-                // Assign final score (1st=11, 2nd=9, 3rd=7, 4th=5)
-                groupTeamAssignments.forEach((team: any, index: number) => {
-                    const finalScore = [11, 9, 7, 5][index] || 0;
-                    team.finalScore += finalScore;
-                });
-
-                sittingGroupResults[group.name] = groupTeamAssignments;
-            });
-
-            // Evaluate standing tournament groups
-            const standingGroupResults: Record<string, any[]> = {};
-            standingGroups.forEach(group => {
-                const groupTeamAssignments = groupTeams.filter((gt: any) => gt.group_id === group.id)
-                    .map((gt: any) => teamStats[gt.team_id])
-                    .filter(Boolean);
-                
-                groupTeamAssignments.sort((a: any, b: any) => {
-                    if (a.roundsWonStanding !== b.roundsWonStanding) return b.roundsWonStanding - a.roundsWonStanding;
-                    const pointDiffA = a.totalPointsStanding - a.totalPointsAgainstStanding;
-                    const pointDiffB = b.totalPointsStanding - b.totalPointsAgainstStanding;
-                    if (pointDiffA !== pointDiffB) return pointDiffB - pointDiffA;
-                    return 0;
-                });
-
-                // Assign final score (1st=10, 2nd=8, 3rd=6, 4th=4)
-                groupTeamAssignments.forEach((team: any, index: number) => {
-                    const finalScore = [10, 8, 6, 4][index] || 0;
-                    team.finalScore += finalScore;
-                });
-                
-                standingGroupResults[group.name] = groupTeamAssignments;
-            });
-            
-            // 5. Finally sort allteams by their final scores, rounds won and point difference
-            const finalRanking = Object.values(teamStats).sort((a: any, b: any) => {
-                if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore;
-                if (b.roundsWonSitting + b.roundsWonStanding !== a.roundsWonSitting + a.roundsWonStanding) {
-                    return b.roundsWonSitting + b.roundsWonStanding - (a.roundsWonSitting + a.roundsWonStanding);
-                }
-                const pointDiffA = (a.totalPointsSitting + a.totalPointsStanding) - (a.totalPointsAgainstSitting + a.totalPointsAgainstStanding);
-                const pointDiffB = (b.totalPointsSitting + b.totalPointsStanding) - (b.totalPointsAgainstSitting + b.totalPointsAgainstStanding);
-                return pointDiffB - pointDiffA;
-            });
-
-            // 6. Create new tournaments for Finalrunde
-            const finalrundeSittingTournamentId = uuidv4();
-            const finalrundeStandingTournamentId = uuidv4();
-            
-            await Promise.all([
-                TournamentsService.createTournament({ 
-                    id: finalrundeSittingTournamentId, 
-                    icke_cup_id: cupId, 
-                    sitting: 1 
-                }),
-                TournamentsService.createTournament({ 
-                    id: finalrundeStandingTournamentId, 
-                    icke_cup_id: cupId, 
-                    sitting: 0 
-                })
-            ]);
-            
             // 7. Create new groups E, F, G, H based on final ranking (Group E: 1st of Groups A/B/C/D, Group F: 2nd of Groups A/B/C/D, Group G: 3rd of Groups A/B/C/D, Group H: 4th of Groups A/B/C/D)
             // First, get the group IDs for A, B, C, D
-            const groupA = groups.find(g => g.name === 'A');
-            const groupB = groups.find(g => g.name === 'B');
-            const groupC = groups.find(g => g.name === 'C');
-            const groupD = groups.find(g => g.name === 'D');
+            const groupA = cupGroups.find((g: any) => g.name === 'A');
+            const groupB = cupGroups.find((g: any) => g.name === 'B');
+            const groupC = cupGroups.find((g: any) => g.name === 'C');
+            const groupD = cupGroups.find((g: any) => g.name === 'D');
 
-            // Get teams for each group and sort them by their performance in that group
-            const getGroupRanking = (groupId: string) => {
-                const groupTeamIds = groupTeams.filter((gt: any) => gt.group_id === groupId).map((gt: any) => gt.team_id);
-                return groupTeamIds.map(teamId => teamStats[teamId]).filter(Boolean).sort((a: any, b: any) => {
-                    if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore;
-                    if (b.roundsWonSitting + b.roundsWonStanding !== a.roundsWonSitting + a.roundsWonStanding) {
-                        return b.roundsWonSitting + b.roundsWonStanding - (a.roundsWonSitting + a.roundsWonStanding);
-                    }
-                    const pointDiffA = (a.totalPointsSitting + a.totalPointsStanding) - (a.totalPointsAgainstSitting + a.totalPointsAgainstStanding);
-                    const pointDiffB = (b.totalPointsSitting + b.totalPointsStanding) - (b.totalPointsAgainstSitting + b.totalPointsAgainstStanding);
-                    return pointDiffB - pointDiffA;
-                });
-            };
-
-            const groupARanking = getGroupRanking(groupA?.id);
-            const groupBRanking = getGroupRanking(groupB?.id);
-            const groupCRanking = getGroupRanking(groupC?.id);
-            const groupDRanking = getGroupRanking(groupD?.id);
+            const groupARanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupA?.id);
+            const groupBRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupB?.id);
+            const groupCRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupC?.id);
+            const groupDRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupD?.id);
             console.log(groupARanking, groupBRanking, groupCRanking, groupDRanking);
 
             const groupE = [groupARanking[0], groupBRanking[0], groupCRanking[0], groupDRanking[0]].filter(Boolean);
@@ -386,36 +232,24 @@ export default function CupDetails() {
             console.log(groupE, groupF, groupG, groupH);
 
             // Create groups in database
-            const groupEIdSitting = uuidv4();
-            const groupFIdSitting = uuidv4();
-            const groupGIdSitting = uuidv4();
-            const groupHIdSitting = uuidv4();
-            const groupEIdStanding = uuidv4();
-            const groupFIdStanding = uuidv4();
-            const groupGIdStanding = uuidv4();
-            const groupHIdStanding = uuidv4();
+            const groupEId = uuidv4();
+            const groupFId = uuidv4();
+            const groupGId = uuidv4();
+            const groupHId = uuidv4();
 
             await Promise.all([
-                GroupsService.createGroup({ id: groupEIdSitting, tournament_id: finalrundeSittingTournamentId, name: 'E' }),
-                GroupsService.createGroup({ id: groupFIdSitting, tournament_id: finalrundeSittingTournamentId, name: 'F' }),
-                GroupsService.createGroup({ id: groupGIdSitting, tournament_id: finalrundeSittingTournamentId, name: 'G' }),
-                GroupsService.createGroup({ id: groupHIdSitting, tournament_id: finalrundeSittingTournamentId, name: 'H' }),
-                GroupsService.createGroup({ id: groupEIdStanding, tournament_id: finalrundeStandingTournamentId, name: 'E' }),
-                GroupsService.createGroup({ id: groupFIdStanding, tournament_id: finalrundeStandingTournamentId, name: 'F' }),
-                GroupsService.createGroup({ id: groupGIdStanding, tournament_id: finalrundeStandingTournamentId, name: 'G' }),
-                GroupsService.createGroup({ id: groupHIdStanding, tournament_id: finalrundeStandingTournamentId, name: 'H' })
+                GroupsService.createGroup({ id: groupEId, icke_cup_id: cupId, name: 'E' }),
+                GroupsService.createGroup({ id: groupFId, icke_cup_id: cupId, name: 'F' }),
+                GroupsService.createGroup({ id: groupGId, icke_cup_id: cupId, name: 'G' }),
+                GroupsService.createGroup({ id: groupHId, icke_cup_id: cupId, name: 'H' })
             ]);
             
             // 8. Assign teams to new groups
             const groupAssignments = [
-                ...groupE.map((team: any) => ({ group_id: groupEIdSitting, team_id: team.id })),
-                ...groupF.map((team: any) => ({ group_id: groupFIdSitting, team_id: team.id })),
-                ...groupG.map((team: any) => ({ group_id: groupGIdSitting, team_id: team.id })),
-                ...groupH.map((team: any) => ({ group_id: groupHIdSitting, team_id: team.id })),
-                ...groupE.map((team: any) => ({ group_id: groupEIdStanding, team_id: team.id })),
-                ...groupF.map((team: any) => ({ group_id: groupFIdStanding, team_id: team.id })),
-                ...groupG.map((team: any) => ({ group_id: groupGIdStanding, team_id: team.id })),
-                ...groupH.map((team: any) => ({ group_id: groupHIdStanding, team_id: team.id }))
+                ...groupE.map((team: any) => ({ group_id: groupEId, team_id: team.id })),
+                ...groupF.map((team: any) => ({ group_id: groupFId, team_id: team.id })),
+                ...groupG.map((team: any) => ({ group_id: groupGId, team_id: team.id })),
+                ...groupH.map((team: any) => ({ group_id: groupHId, team_id: team.id }))
             ];
 
             await Promise.all(groupAssignments.map(assignment =>
@@ -429,28 +263,15 @@ export default function CupDetails() {
             start.setHours(Number(h), Number(m), 0, 0);
             
             // Create a mapping of group names to their team assignments
-            const groupTeamMapSitting: Record<string, any[]> = {
-                'E': groupAssignments.filter(gt => gt.group_id === groupEIdSitting),
-                'F': groupAssignments.filter(gt => gt.group_id === groupFIdSitting),
-                'G': groupAssignments.filter(gt => gt.group_id === groupGIdSitting),
-                'H': groupAssignments.filter(gt => gt.group_id === groupHIdSitting)
-            };
-
-            const groupTeamMapStanding: Record<string, any[]> = {
-                'E': groupAssignments.filter(gt => gt.group_id === groupEIdStanding),
-                'F': groupAssignments.filter(gt => gt.group_id === groupFIdStanding),
-                'G': groupAssignments.filter(gt => gt.group_id === groupGIdStanding),
-                'H': groupAssignments.filter(gt => gt.group_id === groupHIdStanding)
+            const groupTeamMap: Record<string, any[]> = {
+                'E': groupAssignments.filter(gt => gt.group_id === groupEId),
+                'F': groupAssignments.filter(gt => gt.group_id === groupFId),
+                'G': groupAssignments.filter(gt => gt.group_id === groupGId),
+                'H': groupAssignments.filter(gt => gt.group_id === groupHId)
             };
             
-            const getTeamIdFromSittingGroup = (groupName: string, position: number) => {
-                const groupTeams = groupTeamMapSitting[groupName];
-                if (!groupTeams || position < 1 || position > groupTeams.length) return null;
-                return groupTeams[position - 1]?.team_id;
-            };
-
-            const getTeamIdFromStandingGroup = (groupName: string, position: number) => {
-                const groupTeams = groupTeamMapStanding[groupName];
+            const getTeamIdFromGroup = (groupName: string, position: number) => {
+                const groupTeams = groupTeamMap[groupName];
                 if (!groupTeams || position < 1 || position > groupTeams.length) return null;
                 return groupTeams[position - 1]?.team_id;
             };
@@ -465,8 +286,8 @@ export default function CupDetails() {
                     const groupL = left[0], numL = Number(left[1]);
                     const groupR = right[0], numR = Number(right[1]);
 
-                    const team1Id = COURT_TYPE[court] ? getTeamIdFromSittingGroup(groupL, numL) : getTeamIdFromStandingGroup(groupL, numL);
-                    const team2Id = COURT_TYPE[court] ? getTeamIdFromSittingGroup(groupR, numR) : getTeamIdFromStandingGroup(groupR, numR);
+                    const team1Id = getTeamIdFromGroup(groupL, numL);
+                    const team2Id = getTeamIdFromGroup(groupR, numR);
 
                     if (!team1Id || !team2Id) continue;
                     
@@ -481,7 +302,7 @@ export default function CupDetails() {
                         points_team_1: 0,
                         points_team_2: 0,
                         start_at: localDateString,
-                        tournament_id: COURT_TYPE[court] ? finalrundeSittingTournamentId : finalrundeStandingTournamentId,
+                        icke_cup_id: cupId,
                         round: "Finalrunde",
                         sitting: COURT_TYPE[court] ? 1 : 0,
                         court: court + 1
@@ -521,12 +342,8 @@ export default function CupDetails() {
         setGameSuccess("");
         try {
             // 1. Get all games (both Vorrunde and Finalrunde)
-            const gamesRes = [];
-            for (const tournament of tournaments) {
-                const games = await GamesService.getGamesByTournamentId(tournament.id);
-                gamesRes.push(...games);
-            }
-            const finalrundeGames = gamesRes.filter((g: any) => g.round === 'Finalrunde');
+            const allGames = await GamesService.getGamesByCupId(cupId as string);
+            const finalrundeGames = allGames.filter((g: any) => g.round === 'Finalrunde');
             
             // 2. Get all teams
             const teamsRes = await TeamsService.getTeamsByCupId(cupId as string);

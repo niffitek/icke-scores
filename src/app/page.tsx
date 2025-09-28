@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import CupsService from "@/services/cups";
-import TournamentsService from "@/services/tournaments";
 import TeamsService from "@/services/teams";
 import GamesService from "@/services/games";
 
@@ -13,7 +12,7 @@ type Game = {
   team_2_id: number;
   start_at: string; // ISO string
   round: string;
-  tournament_id: number;
+  icke_cup_id: string;
   team1Name?: string;
   team2Name?: string;
   status?: "upcoming" | "live" | "finished";
@@ -42,19 +41,11 @@ export default function Home() {
         return;
       }
 
-      // Get tournaments for the active cup
-      const activeTournaments = await TournamentsService.getTournamentsByCupId(activeCup.id);
-      const activeTournamentIds = activeTournaments.map((tournament: any) => tournament.id);
-
       // Get all teams for the active cup
       const teamsData = await TeamsService.getTeamsByCupId(activeCup.id);
 
-      // Get all games for active tournaments
-      let allGames: any[] = [];
-      for (const tournamentId of activeTournamentIds) {
-        const games = await GamesService.getGamesByTournamentId(tournamentId);
-        allGames = allGames.concat(games);
-      }
+      // Get all games for the active cup
+      const allGames = await GamesService.getGamesByCupId(activeCup.id);
 
       // Create team name mapping
       const teamMap = Object.fromEntries(

@@ -6,8 +6,8 @@ class GroupsService {
         return response.data;
     }
 
-    static async getGroupsByTournamentId(tournamentId: string) {
-        const response = await api.get(`?path=groups&tournament_id=${tournamentId}`);
+    static async getGroupsByCupId(cupId: string) {
+        const response = await api.get(`?path=groups&icke_cup_id=${cupId}`);
         return response.data;
     }
 

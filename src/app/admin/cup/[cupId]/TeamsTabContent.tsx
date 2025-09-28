@@ -26,19 +26,14 @@ export default function TeamsTabContent({
     const [teamEditLoading, setTeamEditLoading] = useState(false);
     const [teamEditError, setTeamEditError] = useState('');
     const [teamDeleteLoading, setTeamDeleteLoading] = useState('');
-    const [tournaments, setTournaments] = useState<any[]>([]);
     const [groups, setGroups] = useState<any[]>([]);
     const [selectedGroup, setSelectedGroup] = useState(cup.state === "Finalrunde" ? 'E' : 'A');
     const [editSelectedGroup, setEditSelectedGroup] = useState(cup.state === "Finalrunde" ? 'E' : 'A');
     const [groupTeams, setGroupTeams] = useState<any[]>([]);
 
     useEffect(() => {
-        api.get(`?path=tournaments`).then(res => {
-            const ts = res.data.filter((t: any) => t.icke_cup_id === cup.id);
-            setTournaments(ts);
-            api.get(`?path=groups`).then(res2 => {
-                setGroups(res2.data.filter((g: any) => ts.some((t: any) => t.id === g.tournament_id)));
-            });
+        api.get(`?path=groups&icke_cup_id=${cupId}`).then(res => {
+            setGroups(res.data);
         });
         api.get(`?path=teams`).then(res => {
             setTeams(res.data);
@@ -63,11 +58,7 @@ export default function TeamsTabContent({
                 return group.name;
             }
         }
-        
-        // If no relevant group found, return the first group name (fallback)
-        const firstGt = teamGroupAssignments[0];
-        const firstGroup = groups.find((g: any) => g.id === firstGt.group_id);
-        return firstGroup ? firstGroup.name : '-';
+        return '-';
     };
 
     const handleSaveTeam = async () => {
@@ -90,19 +81,17 @@ export default function TeamsTabContent({
                     "Authorization": `Bearer ${token}`,
                 },
             });
-            // Assign to group in both tournaments
-            for (const t of tournaments) {
-                const group = groups.find((g: any) => g.tournament_id === t.id && g.name === editSelectedGroup);
-                if (group) {
-                    await api.post(`?path=group_teams`, {
-                        group_id: group.id,
-                        team_id: editTeam.id,
-                    }, {
-                        headers: {
-                            "Authorization": `Bearer ${token}`,
-                        },
-                    });
-                }
+            // Assign to group
+            const group = groups.find((g: any) => g.name === editSelectedGroup);
+            if (group) {
+                await api.post(`?path=group_teams`, {
+                    group_id: group.id,
+                    team_id: editTeam.id,
+                }, {
+                    headers: {
+                        "Authorization": `Bearer ${token}`,
+                    },
+                });
             }
             setShowEditDialog(false);
             setEditTeam(null);
@@ -154,19 +143,17 @@ export default function TeamsTabContent({
                     "Authorization": `Bearer ${token}`,
                 },
             });
-            // Assign to group in both tournaments
-            for (const t of tournaments) {
-                const group = groups.find((g: any) => g.tournament_id === t.id && g.name === selectedGroup);
-                if (group) {
-                    await api.post(`?path=group_teams`, {
-                        group_id: group.id,
-                        team_id: newId,
-                    }, {
-                        headers: {
-                            "Authorization": `Bearer ${token}`,
-                        },
-                    });
-                }
+            // Assign to group
+            const group = groups.find((g: any) => g.name === selectedGroup);
+            if (group) {
+                await api.post(`?path=group_teams`, {
+                    group_id: group.id,
+                    team_id: newId,
+                }, {
+                    headers: {
+                        "Authorization": `Bearer ${token}`,
+                    },
+                });
             }
             setShowCreateDialog(false);
             setNewTeam({ name: '', contact: '' });

@@ -40,10 +40,10 @@ export default function RootLayout({
             </ul>
           </nav>
         </header>
-        <main className="flex-1 container mx-auto px-4 py-6">
+        <main className="flex-1 container mx-auto px-4 py-3 min-h-0">
           {children}
         </main>
-        <footer className="bg-white shadow p-4 text-center text-sm">
+        <footer className="bg-white shadow p-2 text-center text-xs">
           &copy; 2025 IckeSports-Sportmarketing. All rights reserved.
         </footer>
       </body>

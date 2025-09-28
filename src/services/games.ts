@@ -42,10 +42,10 @@ class GamesService {
         return response.data;
     }
 
-    static async getGamesByTournamentId(tournamentId: string) {
+    static async getGamesByCupId(cupId: string) {
         const response = await api.get("?path=games");
         const games = response.data;
-        return games.filter((game: any) => game.tournament_id === tournamentId);
+        return games.filter((game: any) => game.icke_cup_id === cupId);
     }
 
     static async createMultipleGames(games: any[]) {
