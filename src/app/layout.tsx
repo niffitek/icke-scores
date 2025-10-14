@@ -15,25 +15,25 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-gray-100 flex flex-col">
-        <header className="bg-white shadow">
+        <header className="bg-white shadow sticky top-0 z-50">
           <nav className="container mx-auto px-4 py-4 flex justify-between items-center">
-            <div className="text-2xl font-bold">
+            <div className="text-lg sm:text-xl font-bold">
               <span className="text-[#da333c]">Icke</span>
               <span className="text-[#149567]">Cup</span>
             </div>
-            <ul className="flex space-x-4">
+            <ul className="flex space-x-2 sm:space-x-4">
               <li>
-                <Link href="/" className="hover:text-[#da333c]">
+                <Link href="/" className="hover:text-[#da333c] text-sm sm:text-base whitespace-nowrap">
                   Dashboard
                 </Link>
               </li>
               <li>
-                <Link href="/scores" className="hover:text-[#da333c]">
+                <Link href="/scores" className="hover:text-[#da333c] text-sm sm:text-base whitespace-nowrap">
                   Rangliste
                 </Link>
               </li>
               <li>
-                <Link href="/games" className="hover:text-[#da333c]">
+                <Link href="/games" className="hover:text-[#da333c] text-sm sm:text-base whitespace-nowrap">
                   Alle Spiele
                 </Link>
               </li>

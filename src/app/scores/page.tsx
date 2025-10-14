@@ -203,13 +203,7 @@ export default function ScoresPage() {
                               </div>
                             </div>
                             
-                            {/* Final Score */}
-                            <div className="text-center min-w-0 flex-1 sm:flex-initial sm:min-w-16">
-                              <div className="text-xs sm:text-sm font-semibold text-gray-700">Score</div>
-                              <div className="text-sm sm:text-lg font-bold text-blue-600">
-                                {team.finalScore}
-                              </div>
-                            </div>
+                            
                           </div>
                         </div>
                       </div>
