@@ -138,7 +138,7 @@ export default function ScoresPage() {
   return (
     <section className="h-full flex flex-col">
       <h1 className="text-xl font-semibold mb-2 text-center flex-shrink-0">
-        Team Rankings {cupState && `- ${cupState}`}
+        Team Ranglisten {cupState && `- ${cupState}`}
       </h1>
 
       {loading ? (
@@ -165,49 +165,53 @@ export default function ScoresPage() {
                     return (
                       <div
                         key={team.id}
-                        className="bg-white rounded-lg shadow px-4 py-1 flex items-center gap-2 flex-shrink-0"
+                        className="bg-white rounded-lg shadow px-3 py-2 flex-shrink-0"
                       >
-                        {/* Place */}
-                        <div className="text-2xl font-bold text-gray-500 w-8 text-center">
-                          {index + 1}
-                        </div>
-                        
-                        {/* Team Name */}
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-lg">{team.name}</h3>
-                        </div>
-                        
-                        {/* Sitting Stats */}
-                        <div className="text-center min-w-20">
-                          <div className="text-sm font-semibold text-gray-700">Sitzen</div>
-                          <div className="text-lg font-bold">
-                            {team.roundsWonSitting} Siege
-                          </div>
-                          <div className="text-sm font-medium text-gray-600">
-                            {sittingPointDiff > 0 ? '+' : ''}{sittingPointDiff}
-                          </div>
-                        </div>
-                        
-                        {/* Standing Stats */}
-                        <div className="text-center min-w-20">
-                          <div className="text-sm font-semibold text-gray-700">Stehen</div>
-                          <div className="text-lg font-bold">
-                            {team.roundsWonStanding} Siege
-                          </div>
-                          <div className="text-sm font-medium text-gray-600">
-                            {standingPointDiff > 0 ? '+' : ''}{standingPointDiff}
-                          </div>
-                        </div>
-                        
-                        {/* Final Score (for Finalrunde) */}
-                        
-                          <div className="text-center min-w-16">
-                            <div className="text-sm font-semibold text-gray-700">Score</div>
-                            <div className="text-lg font-bold text-blue-600">
-                              {team.finalScore}
+                        {/* Mobile Layout - Stack vertically on small screens */}
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                          {/* Top row: Place and Team Name */}
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="text-xl sm:text-2xl font-bold text-gray-500 w-6 sm:w-8 text-center flex-shrink-0">
+                              {index + 1}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-semibold text-base sm:text-lg truncate">{team.name}</h3>
                             </div>
                           </div>
-                    
+                          
+                          {/* Stats row - horizontal on mobile, stays in line on desktop */}
+                          <div className="flex justify-between sm:justify-end gap-2 sm:gap-4">
+                            {/* Sitting Stats */}
+                            <div className="text-center min-w-0 flex-1 sm:flex-initial sm:min-w-20">
+                              <div className="text-xs sm:text-sm font-semibold text-gray-700">Sitzen</div>
+                              <div className="text-sm sm:text-lg font-bold">
+                                {team.roundsWonSitting} Siege
+                              </div>
+                              <div className="text-xs sm:text-sm font-medium text-gray-600">
+                                {sittingPointDiff > 0 ? '+' : ''}{sittingPointDiff}
+                              </div>
+                            </div>
+                            
+                            {/* Standing Stats */}
+                            <div className="text-center min-w-0 flex-1 sm:flex-initial sm:min-w-20">
+                              <div className="text-xs sm:text-sm font-semibold text-gray-700">Stehen</div>
+                              <div className="text-sm sm:text-lg font-bold">
+                                {team.roundsWonStanding} Siege
+                              </div>
+                              <div className="text-xs sm:text-sm font-medium text-gray-600">
+                                {standingPointDiff > 0 ? '+' : ''}{standingPointDiff}
+                              </div>
+                            </div>
+                            
+                            {/* Final Score */}
+                            <div className="text-center min-w-0 flex-1 sm:flex-initial sm:min-w-16">
+                              <div className="text-xs sm:text-sm font-semibold text-gray-700">Score</div>
+                              <div className="text-sm sm:text-lg font-bold text-blue-600">
+                                {team.finalScore}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     );
                   })}

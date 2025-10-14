@@ -29,12 +29,12 @@ export default function RootLayout({
               </li>
               <li>
                 <Link href="/scores" className="hover:text-[#da333c]">
-                  Scores
+                  Rangliste
                 </Link>
               </li>
               <li>
                 <Link href="/games" className="hover:text-[#da333c]">
-                  All Games
+                  Alle Spiele
                 </Link>
               </li>
             </ul>
