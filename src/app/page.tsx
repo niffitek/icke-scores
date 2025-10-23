@@ -169,13 +169,13 @@ export default function Home() {
 
   return (
     <section>
-      <h1 className="text-xl font-semibold mb-4">
-        Nächste Runde - {currentRound}
-      </h1>
+      <div className="flex items-center gap-2 mb-4">
+        <h1 className="text-xl font-semibold">
+          Nächste Runde - {currentRound}
+        </h1>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {loading
-          ? <p>Lade Spiele...</p>
-          : games.length === 0
+        {games.length === 0 && !loading
           ? <p>Keine anstehenden Spiele gefunden.</p>
           : games.map((game) => (
               <div

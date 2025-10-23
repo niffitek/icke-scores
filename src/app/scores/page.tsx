@@ -137,15 +137,13 @@ export default function ScoresPage() {
 
   return (
     <section className="h-full flex flex-col">
-      <h1 className="text-xl font-semibold mb-2 text-center flex-shrink-0">
-        Team Ranglisten {cupState && `- ${cupState}`}
-      </h1>
+      <div className="flex items-center justify-center gap-2 mb-2 flex-shrink-0">
+        <h1 className="text-xl font-semibold text-center">
+          Team Ranglisten {cupState && `- ${cupState}`}
+        </h1>
+      </div>
 
-      {loading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <p>Lade Rangliste...</p>
-        </div>
-      ) : groupStats.length === 0 ? (
+      {groupStats.length === 0 && !loading ? (
         <div className="flex-1 flex items-center justify-center">
           <p>Keine Teams oder Spiele gefunden.</p>
         </div>

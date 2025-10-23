@@ -150,7 +150,9 @@ export default function GamesPage() {
   return (
     <section>
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-xl font-semibold">Alle Spiele</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold">Alle Spiele</h1>
+        </div>
 
         {/* Filter buttons */}
         <div className="flex gap-2">
@@ -188,9 +190,7 @@ export default function GamesPage() {
       </div>
 
       <div className="space-y-2">
-        {loading ? (
-          <p>Lade Spiele...</p>
-        ) : filteredGames.length === 0 ? (
+        {filteredGames.length === 0 && !loading ? (
           <p>Keine Spiele gefunden.</p>
         ) : (
           filteredGames.map((game) => (
