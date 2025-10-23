@@ -304,8 +304,8 @@ export default function VorrundeTabContent({ cupId }: { cupId: string }) {
                         <TableHead>Team B</TableHead>
                         <TableHead>Zeit</TableHead>
                         <TableHead>Feld</TableHead>
-                        <TableHead>Runde 1</TableHead>
-                        <TableHead>Runde 2</TableHead>
+                        <TableHead>Satz 1</TableHead>
+                        <TableHead>Satz 2</TableHead>
                         <TableHead>Gesamt</TableHead>
                         <TableHead>Gewinner</TableHead>
                         <TableHead className="w-12 text-right"></TableHead>

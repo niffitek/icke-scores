@@ -235,12 +235,12 @@ export default function GamesPage() {
                 <div className="text-center space-y-1">
                   {(game.round1_points_team_1 !== null && game.round1_points_team_1 !== undefined) && (
                     <div className="text-sm text-gray-700">
-                      <span className="font-medium">Runde 1:</span> {game.round1_points_team_1} - {game.round1_points_team_2}
+                      <span className="font-medium">Satz 1:</span> {game.round1_points_team_1} - {game.round1_points_team_2}
                     </div>
                   )}
                   {(game.round2_points_team_1 !== null && game.round2_points_team_1 !== undefined) && (
                     <div className="text-sm text-gray-700">
-                      <span className="font-medium">Runde 2:</span> {game.round2_points_team_1} - {game.round2_points_team_2}
+                      <span className="font-medium">Satz 2:</span> {game.round2_points_team_1} - {game.round2_points_team_2}
                     </div>
                   )}
                 </div>
