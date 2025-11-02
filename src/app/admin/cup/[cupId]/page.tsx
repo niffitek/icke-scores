@@ -135,6 +135,7 @@ export default function CupDetails() {
         setGameError("");
         setGameSuccess("");
         try {
+            await refreshTeams();
             // 1. Group teams
             const sittingGrouped = getGroupedTeams();
             const standingGrouped = getGroupedTeams();
@@ -173,6 +174,7 @@ export default function CupDetails() {
                     });
                 }
             }
+            console.log(games);
             // 4. Save games (bulk insert if supported, else one by one)
             await GamesService.createMultipleGames(games);
             // 5. Update cup status

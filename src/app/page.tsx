@@ -160,13 +160,6 @@ export default function Home() {
     }
   };
 
-  const hasScores = (game: Game) => {
-    return (game.round1_points_team_1 !== null && game.round1_points_team_1 !== undefined) ||
-           (game.round1_points_team_2 !== null && game.round1_points_team_2 !== undefined) ||
-           (game.round2_points_team_1 !== null && game.round2_points_team_1 !== undefined) ||
-           (game.round2_points_team_2 !== null && game.round2_points_team_2 !== undefined);
-  };
-
   return (
     <section>
       <div className="flex items-center gap-2 mb-4">
@@ -191,7 +184,7 @@ export default function Home() {
                         minute: "2-digit",
                       })}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm">
                       {game.round}
                     </p>
                   </div>
@@ -203,32 +196,16 @@ export default function Home() {
                     >
                       {getStatusText(game.status!)}
                     </p>
-                    <p className="text-xs text-gray-500">Feld {game.court}</p>
+                    <p className="text-sm">Feld {game.court} ({game.court < 4 ? "Sitzen" : "Stehen"})</p>
                   </div>
                 </div>
 
                 {/* Center: Team names */}
                 <div className="text-center mb-3">
-                  <p className="font-medium text-lg">
+                  <p className="font-medium text-2xl">
                     {game.team1Name} vs {game.team2Name}
                   </p>
                 </div>
-
-                {/* Center: Scores below team names */}
-                {hasScores(game) && (
-                  <div className="text-center space-y-1">
-                    {(game.round1_points_team_1 !== null && game.round1_points_team_1 !== undefined) && (
-                      <div className="text-sm text-gray-700">
-                        <span className="font-medium">Runde 1:</span> {game.round1_points_team_1} - {game.round1_points_team_2}
-                      </div>
-                    )}
-                    {(game.round2_points_team_1 !== null && game.round2_points_team_1 !== undefined) && (
-                      <div className="text-sm text-gray-700">
-                        <span className="font-medium">Runde 2:</span> {game.round2_points_team_1} - {game.round2_points_team_2}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             ))}
       </div>
