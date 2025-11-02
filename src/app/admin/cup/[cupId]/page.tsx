@@ -341,7 +341,7 @@ export default function CupDetails() {
         setGameError("");
         setGameSuccess("");
         try {
-            // 1. Get all games (both Vorrunde and Finalrunde)
+            // 1. Get all Finalrunde games with their results
             const allGames = await GamesService.getGamesByCupId(cupId as string);
             const finalrundeGames = allGames.filter((g: any) => g.round === 'Finalrunde');
             
@@ -349,119 +349,69 @@ export default function CupDetails() {
             const teamsRes = await TeamsService.getTeamsByCupId(cupId as string);
             const allTeams = teamsRes.filter((t: any) => t.icke_cup_id === cupId);
             
-            // 3. Get all groups and group_teams for Finalrunde
-            const groupsRes = await GroupsService.getGroups();
-            const groupTeamsRes = await GroupTeamsService.getGroupTeams();
-            const finalGroups = groupsRes.filter((g: any) => ['E','F','G','H'].includes(g.name));
-            const groupTeams = groupTeamsRes;
+            let teamStats: Record<string, any> = RankingService.getAllTeamStats(allTeams, groupTeams);
             
-            // 4. Evaluate Finalrunde group results using same logic as Vorrunde
-            const finalTeamStats: Record<string, any> = {};
-            allTeams.forEach((team: any) => {
-                finalTeamStats[team.id] = {
-                    id: team.id,
-                    name: team.name,
-                    contact: team.contact,
-                    roundsWonSitting: 0,
-                    roundsWonStanding: 0,
-                    totalPointsSitting: 0,
-                    totalPointsStanding: 0,
-                    totalPointsAgainstSitting: 0,
-                    totalPointsAgainstStanding: 0,
-                    gamesPlayed: 0
-                };
-            });
-            
-            finalrundeGames.forEach((game: any) => {
-                const team1Stats = finalTeamStats[game.team_1_id];
-                const team2Stats = finalTeamStats[game.team_2_id];
-                if (team1Stats && team2Stats) {
-                    team1Stats.gamesPlayed++;
-                    team2Stats.gamesPlayed++;
-                    const round1Team1Won = game.round1_winner === game.team_1_id;
-                    const round2Team1Won = game.round2_winner === game.team_1_id;
-                    const round1Team2Won = game.round1_winner === game.team_2_id;
-                    const round2Team2Won = game.round2_winner === game.team_2_id;
-                    
-                    if (game.sitting === '1') {
-                        if (round1Team1Won) team1Stats.roundsWonSitting++;
-                        if (round2Team1Won) team1Stats.roundsWonSitting++;
-                        if (round1Team2Won) team2Stats.roundsWonSitting++;
-                        if (round2Team2Won) team2Stats.roundsWonSitting++;
-                        
-                        team1Stats.totalPointsSitting += (parseInt(game.round1_points_team_1) || 0) + (parseInt(game.round2_points_team_1) || 0);
-                        team2Stats.totalPointsSitting += (parseInt(game.round1_points_team_2) || 0) + (parseInt(game.round2_points_team_2) || 0);
-                        team1Stats.totalPointsAgainstSitting += (parseInt(game.round1_points_team_2) || 0) + (parseInt(game.round2_points_team_2) || 0);
-                        team2Stats.totalPointsAgainstSitting += (parseInt(game.round1_points_team_1) || 0) + (parseInt(game.round2_points_team_1) || 0);
-                    } else if (game.sitting === '0') {
-                        if (round1Team1Won) team1Stats.roundsWonStanding++;
-                        if (round2Team1Won) team1Stats.roundsWonStanding++;
-                        if (round1Team2Won) team2Stats.roundsWonStanding++;
-                        if (round2Team2Won) team2Stats.roundsWonStanding++;
-                        
-                        team1Stats.totalPointsStanding += (parseInt(game.round1_points_team_1) || 0) + (parseInt(game.round2_points_team_1) || 0);
-                        team2Stats.totalPointsStanding += (parseInt(game.round1_points_team_2) || 0) + (parseInt(game.round2_points_team_2) || 0);
-                        team1Stats.totalPointsAgainstStanding += (parseInt(game.round1_points_team_2) || 0) + (parseInt(game.round2_points_team_2) || 0);
-                        team2Stats.totalPointsAgainstStanding += (parseInt(game.round1_points_team_1) || 0) + (parseInt(game.round2_points_team_1) || 0);
-                    }
-                }
-            });
-            // 5. For each group, sort by Finalrunde performance using same logic as Vorrunde
-            const groupOffsets = { E: 0, F: 4, G: 8, H: 12 };
+            const cupGroups = await GroupsService.getGroupsByCupId(cupId as string);
+
+            teamStats = RankingService.fillAllTeamStats(teamStats, finalrundeGames, cupGroups, groupTeams);
+
+            // First, get the group IDs for E, F, G, H
+            const groupE = cupGroups.find((g: any) => g.name === 'E');
+            const groupF = cupGroups.find((g: any) => g.name === 'F');
+            const groupG = cupGroups.find((g: any) => g.name === 'G');
+            const groupH = cupGroups.find((g: any) => g.name === 'H');
+
+            // 3. For each group, sort by Finalrunde performance
+            const groupERanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupE?.id);
+            const groupFRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupF?.id);
+            const groupGRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupG?.id);
+            const groupHRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupH?.id);
+
             const finalPlaceUpdates: any[] = [];
-            
-            // Get finalrunde groups
-            const finalrundeGroups = await GroupsService.getGroups();
-            const finalrundeGroupTeams = await GroupTeamsService.getGroupTeams();
-            
-            const finalrundeGroupE = finalrundeGroups.find((g: any) => g.name === 'E');
-            const finalrundeGroupF = finalrundeGroups.find((g: any) => g.name === 'F');
-            const finalrundeGroupG = finalrundeGroups.find((g: any) => g.name === 'G');
-            const finalrundeGroupH = finalrundeGroups.find((g: any) => g.name === 'H');
-            
-            (['E','F','G','H'] as (keyof typeof groupOffsets)[]).forEach((groupName) => {
-                let groupId: string | undefined;
-                switch(groupName) {
-                    case 'E': groupId = finalrundeGroupE?.id; break;
-                    case 'F': groupId = finalrundeGroupF?.id; break;
-                    case 'G': groupId = finalrundeGroupG?.id; break;
-                    case 'H': groupId = finalrundeGroupH?.id; break;
-                }
-                
-                if (!groupId) return;
-                
-                // Get all team ids in this group
-                const groupTeamIds = finalrundeGroupTeams
-                    .filter((gt: any) => gt.group_id === groupId)
-                    .map((gt: any) => gt.team_id);
-                    
-                // Get stats for these teams
-                const groupStats = groupTeamIds.map((id: any) => finalTeamStats[id]).filter(Boolean);
-                
-                // Sort by Finalrunde performance using same logic as Vorrunde: combined rounds won first, then combined point difference
-                groupStats.sort((a: any, b: any) => {
-                    // Primary: Combined rounds won (sitting + standing)
-                    const totalRoundsA = a.roundsWonSitting + a.roundsWonStanding;
-                    const totalRoundsB = b.roundsWonSitting + b.roundsWonStanding;
-                    if (totalRoundsA !== totalRoundsB) return totalRoundsB - totalRoundsA;
-                    
-                    // Tiebreaker: Combined point difference (sitting + standing)
-                    const pointDiffA = (a.totalPointsSitting + a.totalPointsStanding) - (a.totalPointsAgainstSitting + a.totalPointsAgainstStanding);
-                    const pointDiffB = (b.totalPointsSitting + b.totalPointsStanding) - (b.totalPointsAgainstSitting + b.totalPointsAgainstStanding);
-                    return pointDiffB - pointDiffA;
-                });
-                
-                // Assign final_place
-                groupStats.forEach((team: any, idx: number) => {
-                    const dbTeam = allTeams.find((t: any) => t.id === team.id);
-                    finalPlaceUpdates.push({
-                        id: team.id,
-                        name: dbTeam?.name || team.name,
-                        contact: dbTeam?.contact || team.contact,
-                        final_place: groupOffsets[groupName] + idx + 1
-                    });
+
+            // Assign final_place based on group rankings
+            groupERanking.forEach((team: any, idx: number) => {
+                const dbTeam = allTeams.find((t: any) => t.id === team.id);
+                finalPlaceUpdates.push({
+                    id: team.id,
+                    name: dbTeam?.name || team.name,
+                    contact: dbTeam?.contact || team.contact,
+                    final_place: idx + 1
                 });
             });
+
+            groupFRanking.forEach((team: any, idx: number) => {
+                const dbTeam = allTeams.find((t: any) => t.id === team.id);
+                finalPlaceUpdates.push({
+                    id: team.id,
+                    name: dbTeam?.name || team.name,
+                    contact: dbTeam?.contact || team.contact,
+                    final_place: idx + 5
+                });
+            });
+
+            groupGRanking.forEach((team: any, idx: number) => {
+                const dbTeam = allTeams.find((t: any) => t.id === team.id);
+                finalPlaceUpdates.push({
+                    id: team.id,
+                    name: dbTeam?.name || team.name,
+                    contact: dbTeam?.contact || team.contact,
+                    final_place: idx + 9
+                });
+            });
+
+            groupHRanking.forEach((team: any, idx: number) => {
+                const dbTeam = allTeams.find((t: any) => t.id === team.id);
+                finalPlaceUpdates.push({
+                    id: team.id,
+                    name: dbTeam?.name || team.name,
+                    contact: dbTeam?.contact || team.contact,
+                    final_place: idx + 13
+                });
+            });
+
+            console.log("Final Place Updates:", finalPlaceUpdates);
+
             // 6. Update all teams with their final_place
             await Promise.all(finalPlaceUpdates.map(team =>
                 TeamsService.updateTeam(team.id, team)
@@ -474,6 +424,7 @@ export default function CupDetails() {
                 const cups = res;
                 setCup(cups);
             });
+            setShowCloseTournamentDialog(false); 
         } catch (e) {
             setGameError("Fehler bei der Auswertung der Finalrunde.");
             console.error(e);
@@ -577,7 +528,7 @@ export default function CupDetails() {
                                 <div className="py-4">Sind Sie sicher, dass Sie zur Auswertung fortfahren möchten? Diese Aktion kann nicht rückgängig gemacht werden.</div>
                                 <DialogFooter>
                                     <Button variant="outline" onClick={() => setShowCloseTournamentDialog(false)}>Abbrechen</Button>
-                                    <Button variant="destructive" onClick={async () => { setShowCloseTournamentDialog(false); await handleEvaluateFinalrunde(); }}>Zur Auswertung</Button>
+                                    <Button variant="destructive" onClick={async () => { await handleEvaluateFinalrunde(); }}>Zur Auswertung</Button>
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
