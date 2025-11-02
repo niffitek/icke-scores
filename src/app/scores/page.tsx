@@ -42,6 +42,11 @@ export default function ScoresPage() {
       }
       // Get active cup
       const activeCup = await CupsService.getActiveCup();
+      if (!activeCup) {
+        setGroupStats([]);
+        setCupState("");
+        return;
+      }
       setCupState(activeCup.state);
       // Determine which groups are relevant based on cup state
       const relevantGroups = activeCup.state === "Finalrunde" ? ['E', 'F', 'G', 'H'] : ['A', 'B', 'C', 'D'];
