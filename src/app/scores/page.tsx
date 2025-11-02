@@ -91,7 +91,7 @@ export default function ScoresPage() {
 
       // Populate groups with teams
       for (const group of filteredGroups) {
-        const sortedTeams = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, group.id);
+        const sortedTeams = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, group.id, finishedGames);
         
         if (groupStatsMap[group.name]) {
           groupStatsMap[group.name].teams = sortedTeams;

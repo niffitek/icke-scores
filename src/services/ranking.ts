@@ -106,7 +106,7 @@ class RankingService {
         return teamStats;
     }
 
-    sortTeamStatsByGroup(teamStats: Record<string, any>, groupTeams: any[], groupId: string) {
+    sortTeamStatsByGroup(teamStats: Record<string, any>, groupTeams: any[], groupId: string, games?: any[]) {
         const groupTeamIds = groupTeams.filter((gt: any) => gt.group_id === groupId).map((gt: any) => gt.team_id);
                 return groupTeamIds.map(teamId => teamStats[teamId]).filter(Boolean).sort((a: any, b: any) => {
                     if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore;
@@ -115,7 +115,37 @@ class RankingService {
                     }
                     const pointDiffA = (a.totalPointsSitting + a.totalPointsStanding) - (a.totalPointsAgainstSitting + a.totalPointsAgainstStanding);
                     const pointDiffB = (b.totalPointsSitting + b.totalPointsStanding) - (b.totalPointsAgainstSitting + b.totalPointsAgainstStanding);
-                    return pointDiffB - pointDiffA;
+                    if (pointDiffA !== pointDiffB) {
+                        return pointDiffB - pointDiffA;
+                    }
+                    
+                    // Head-to-head comparison: find the sitting game between teams a and b
+                    if (games) {
+                        const headToHeadGame = games.find((game: any) => 
+                            game.sitting === '1' && // sitting game
+                            ((game.team_1_id === a.id && game.team_2_id === b.id) || 
+                             (game.team_1_id === b.id && game.team_2_id === a.id))
+                        );
+                        
+                        if (headToHeadGame) {
+                            const team1TotalPoints = (parseInt(headToHeadGame.round1_points_team_1, 10) || 0) + (parseInt(headToHeadGame.round2_points_team_1, 10) || 0);
+                            const team2TotalPoints = (parseInt(headToHeadGame.round1_points_team_2, 10) || 0) + (parseInt(headToHeadGame.round2_points_team_2, 10) || 0);
+                            
+                            let gameWinner = null;
+                            if (team1TotalPoints !== team2TotalPoints) {
+                                gameWinner = team1TotalPoints > team2TotalPoints ? headToHeadGame.team_1_id : headToHeadGame.team_2_id;
+                            }
+                            
+                            // If there's a clear winner, rank the winner higher
+                            if (gameWinner) {
+                                console.log(`Head-to-head: ${a.name} vs ${b.name}, winner: ${gameWinner === a.id ? a.name : b.name}`);
+                                if (gameWinner === a.id) return -1; // a wins, a comes first
+                                if (gameWinner === b.id) return 1;  // b wins, b comes first
+                            }
+                        }
+                    }
+                    
+                    return 0;
                 });
     }
 }

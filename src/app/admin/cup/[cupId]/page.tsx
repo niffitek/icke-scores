@@ -221,10 +221,10 @@ export default function CupDetails() {
             const groupC = cupGroups.find((g: any) => g.name === 'C');
             const groupD = cupGroups.find((g: any) => g.name === 'D');
 
-            const groupARanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupA?.id);
-            const groupBRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupB?.id);
-            const groupCRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupC?.id);
-            const groupDRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupD?.id);
+            const groupARanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupA?.id, vorrundeGames);
+            const groupBRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupB?.id, vorrundeGames);
+            const groupCRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupC?.id, vorrundeGames);
+            const groupDRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupD?.id, vorrundeGames);
             console.log(groupARanking, groupBRanking, groupCRanking, groupDRanking);
 
             const groupE = [groupARanking[0], groupBRanking[0], groupCRanking[0], groupDRanking[0]].filter(Boolean);
@@ -313,9 +313,9 @@ export default function CupDetails() {
             }
             
             // Save final games
-            await Promise.all(finalGames.map(game =>
-                GamesService.createGame(game)
-            ));
+            // await Promise.all(finalGames.map(game =>
+            //     GamesService.createGame(game)
+            // ));
             
             // 10. Update cup status
             await CupsService.updateCup(cup.id, { ...cup, state: "Finalrunde" });
@@ -364,10 +364,10 @@ export default function CupDetails() {
             const groupH = cupGroups.find((g: any) => g.name === 'H');
 
             // 3. For each group, sort by Finalrunde performance
-            const groupERanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupE?.id);
-            const groupFRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupF?.id);
-            const groupGRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupG?.id);
-            const groupHRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupH?.id);
+            const groupERanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupE?.id, finalrundeGames);
+            const groupFRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupF?.id, finalrundeGames);
+            const groupGRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupG?.id, finalrundeGames);
+            const groupHRanking = RankingService.sortTeamStatsByGroup(teamStats, groupTeams, groupH?.id, finalrundeGames);
 
             const finalPlaceUpdates: any[] = [];
 
