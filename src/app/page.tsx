@@ -27,7 +27,7 @@ type Game = {
 export default function Home() {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentRound, setCurrentRound] = useState<string>("Vorrunde");
+  const [currentRound, setCurrentRound] = useState<string>();
 
   const fetchGames = async () => {
     try {
@@ -164,12 +164,12 @@ export default function Home() {
     <section>
       <div className="flex items-center gap-2 mb-4">
         <h1 className="text-xl font-semibold">
-          Nächste Runde - {currentRound}
+          {currentRound ? `Nächste Runde - ${currentRound}` : "Bald geht's los!"}
         </h1>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {games.length === 0 && !loading
-          ? <p>Keine anstehenden Spiele gefunden.</p>
+          ? <p>Rutscht euch schon mal warm!</p>
           : games.map((game) => (
               <div
                 key={game.id}

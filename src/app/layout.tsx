@@ -43,8 +43,9 @@ export default function RootLayout({
         <main className="flex-1 container mx-auto px-4 py-3 min-h-0">
           {children}
         </main>
-        <footer className="bg-white shadow p-2 text-center text-xs">
-          &copy; 2025 IckeSports-Sportmarketing. All rights reserved.
+        <footer className="bg-white shadow py-2 px-5 text-center text-xs flex items-center justify-between">
+          <div>&copy; 2025 IckeSports-Sportmarketing. All rights reserved.</div>
+          <div>Made with ✨ by Niffi</div>
         </footer>
       </body>
     </html>
