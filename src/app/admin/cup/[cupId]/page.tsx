@@ -313,9 +313,9 @@ export default function CupDetails() {
             }
             
             // Save final games
-            // await Promise.all(finalGames.map(game =>
-            //     GamesService.createGame(game)
-            // ));
+            await Promise.all(finalGames.map(game =>
+                GamesService.createGame(game)
+            ));
             
             // 10. Update cup status
             await CupsService.updateCup(cup.id, { ...cup, state: "Finalrunde" });
