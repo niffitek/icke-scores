@@ -1,16 +1,17 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import Link from 'next/link';
+import type { Metadata } from 'next'
+import Link from 'next/link'
+
+import './globals.css'
 
 export const metadata: Metadata = {
-  title: "Icke-Cup",
-  description: "Created by IckeSports-Sportmarketing",
-};
+  title: 'Icke-Cup',
+  description: 'Created by IckeSports-Sportmarketing',
+}
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
     <html lang="en">
@@ -40,14 +41,12 @@ export default function RootLayout({
             </ul>
           </nav>
         </header>
-        <main className="flex-1 container mx-auto px-4 py-3 min-h-0">
-          {children}
-        </main>
+        <main className="flex-1 container mx-auto px-4 py-3 min-h-0">{children}</main>
         <footer className="bg-white shadow py-2 px-5 text-center text-xs flex items-center justify-between">
           <div>&copy; 2025 IckeSports-Sportmarketing. All rights reserved.</div>
           <div>Made with ✨ by Niffi</div>
         </footer>
       </body>
     </html>
-  );
+  )
 }

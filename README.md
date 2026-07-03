@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Icke-Scores
 
-## Getting Started
+Next.js app for running the **Icke-Cup** tournament: live game schedule, group rankings, and an admin area to manage cups, teams, and results.
 
-First, run the development server:
+## Tournament model
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- A **cup** has 16 teams in 4 groups (A-D). States: `Bevorstehend → Vorrunde → Finalrunde → Abgeschlossen`.
+- **Vorrunde**: fixed 8-round schedule ([src/configs/schedules.ts](src/configs/schedules.ts)) on 6 courts — courts 1-3 sitting, 4-6 standing.
+- Each game has **2 rounds**; the winner is decided by rounds won, tiebreak by total points.
+- Group ranking awards placement points per discipline (sitting 11/9/7/5, standing 10/8/6/4); ties break by rounds won, point difference, then head-to-head ([src/services/ranking.ts](src/services/ranking.ts)).
+- **Finalrunde**: groups E-H are seeded from the Vorrunde ranks (E = group winners, … H = fourths). Final places 1-16 come from the E-H group rankings.
+
+## Structure
+
+```
+src/
+├── app/          # Next.js app router pages (public: /, /scores, /games; admin: /admin/**)
+├── components/   # ui/ = vendored shadcn components
+├── configs/      # constants + tournament schedules
+├── hooks/        # useAdminAuth (redirects to /admin/login without token)
+├── lib/          # axios instance (auth via request interceptor), game helpers, cn
+├── services/     # typed API access (PHP backend, ?path=<resource>) + ranking logic
+└── types/        # shared tournament types
+__tests__/        # jest unit tests
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The backend is a small PHP API (`?path=cups|teams|games|groups|group_teams|rounds`), configured via `NEXT_PUBLIC_API_URL`. Admin requests carry a Bearer token from `localStorage` (set on `/admin/login`), attached by the axios request interceptor.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm install
+pnpm dev          # http://localhost:3000
 
-## Learn More
+pnpm lint         # eslint --fix
+pnpm lint:check
+pnpm typecheck
+pnpm test         # jest
+pnpm build
+```
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Tooling (ESLint flat config, Prettier, jest) mirrors `adchain-frontend`. A husky **pre-commit** hook runs all three gates (`lint:check`, `typecheck`, `test`) and blocks the commit on any failure.

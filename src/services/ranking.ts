@@ -1,153 +1,135 @@
-class RankingService {
-    getAllTeamStats(teams: any[], groupTeams: any[]) {
-        const teamStats: Record<string, any> = {};
-        teams.forEach((team: any) => {
-                teamStats[team.id] = {
-                    id: team.id,
-                    name: team.name,
-                    group: groupTeams.find((gt: any) => gt.team_id === team.id)?.group_id,
-                    roundsWonSitting: 0,
-                    roundsWonStanding: 0,
-                    totalPointsSitting: 0,
-                    totalPointsStanding: 0,
-                    totalPointsAgainstSitting: 0,
-                    totalPointsAgainstStanding: 0,
-                    finalScore: 0,
-                };
-            });
-        return teamStats;
-    }
+import { isSittingGame, scoreOf } from '@/lib/game-helpers'
+import type { Game, Group, GroupTeam, Team, TeamStats, TeamStatsMap } from '@/types/tournament'
 
-    fillAllTeamStats(teamStats: Record<string, any>, games: any[], groups: any[], groupTeams: any[]) {
-        console.log("groups", groups);
-        games.forEach((game: any) => {
-                const team1Stats = teamStats[game.team_1_id];
-                const team2Stats = teamStats[game.team_2_id];
-                
-                if (team1Stats && team2Stats) {
-                    // Calculate rounds won and total points
-                    const round1Team1Won = game.round1_winner === game.team_1_id;
-                    const round2Team1Won = game.round2_winner === game.team_1_id;
-                    const round1Team2Won = game.round1_winner === game.team_2_id;
-                    const round2Team2Won = game.round2_winner === game.team_2_id;
+// Placement points per group rank (1st..4th), awarded separately per discipline
+const SITTING_PLACEMENT_SCORES = [11, 9, 7, 5]
+const STANDING_PLACEMENT_SCORES = [10, 8, 6, 4]
 
-                    if (game.sitting === '1') {
-                        if (round1Team1Won) team1Stats.roundsWonSitting++;
-                        if (round2Team1Won) team1Stats.roundsWonSitting++;
-                        if (round1Team2Won) team2Stats.roundsWonSitting++;
-                        if (round2Team2Won) team2Stats.roundsWonSitting++;
+export const buildTeamStats = (teams: Team[], groupTeams: GroupTeam[]): TeamStatsMap =>
+  Object.fromEntries(
+    teams.map((team) => [
+      team.id,
+      {
+        id: team.id,
+        name: team.name,
+        group: groupTeams.find((gt) => gt.team_id === team.id)?.group_id,
+        roundsWonSitting: 0,
+        roundsWonStanding: 0,
+        totalPointsSitting: 0,
+        totalPointsStanding: 0,
+        totalPointsAgainstSitting: 0,
+        totalPointsAgainstStanding: 0,
+        finalScore: 0,
+      },
+    ])
+  )
 
-                        team1Stats.totalPointsSitting += (parseInt(game.round1_points_team_1, 10) || 0) + (parseInt(game.round2_points_team_1, 10) || 0);
-                        team2Stats.totalPointsSitting += (parseInt(game.round1_points_team_2, 10) || 0) + (parseInt(game.round2_points_team_2, 10) || 0);
-                        
-                        team1Stats.totalPointsAgainstSitting += (parseInt(game.round1_points_team_2, 10) || 0) + (parseInt(game.round2_points_team_2, 10) || 0);
-                        team2Stats.totalPointsAgainstSitting += (parseInt(game.round1_points_team_1, 10) || 0) + (parseInt(game.round2_points_team_1, 10) || 0);
-                    } else if (game.sitting === '0') {
-                        if (round1Team1Won) team1Stats.roundsWonStanding++;
-                        if (round2Team1Won) team1Stats.roundsWonStanding++;
-                        if (round1Team2Won) team2Stats.roundsWonStanding++;
-                        if (round2Team2Won) team2Stats.roundsWonStanding++;
+const roundsWonBy = (game: Game, teamId: string): number =>
+  Number(game.round1_winner === teamId) + Number(game.round2_winner === teamId)
 
-                        team1Stats.totalPointsStanding += (parseInt(game.round1_points_team_1, 10) || 0) + (parseInt(game.round2_points_team_1, 10) || 0);
-                        team2Stats.totalPointsStanding += (parseInt(game.round1_points_team_2, 10) || 0) + (parseInt(game.round2_points_team_2, 10) || 0);
-                        
-                        team1Stats.totalPointsAgainstStanding += (parseInt(game.round1_points_team_2, 10) || 0) + (parseInt(game.round2_points_team_2, 10) || 0);
-                        team2Stats.totalPointsAgainstStanding += (parseInt(game.round1_points_team_1, 10) || 0) + (parseInt(game.round2_points_team_1, 10) || 0);
-                    }
-                }
-            });
+const teamStatsForGroup = (teamStats: TeamStatsMap, groupTeams: GroupTeam[], groupId?: string): TeamStats[] =>
+  groupTeams
+    .filter((gt) => gt.group_id === groupId)
+    .flatMap((gt) => {
+      const stats = teamStats[gt.team_id]
+      return stats ? [stats] : []
+    })
 
-        const groupResults: Record<string, any[]> = {};
-        groups.forEach(group => {
-            const groupTeamAssignments = groupTeams.filter((gt: any) => gt.group_id === group.id)
-                .map((gt: any) => teamStats[gt.team_id])
-                .filter(Boolean);
-            
-            // Sort by rounds won, then by point difference
-            groupTeamAssignments.sort((a: any, b: any) => {
-                if (a.roundsWonSitting !== b.roundsWonSitting) return b.roundsWonSitting - a.roundsWonSitting;
-                const pointDiffA = a.totalPointsSitting - a.totalPointsAgainstSitting;
-                const pointDiffB = b.totalPointsSitting - b.totalPointsAgainstSitting;
-                if (pointDiffA !== pointDiffB) return pointDiffB - pointDiffA;
-                return 0; // Could add head-to-head comparison here
-            });
-
-            // Assign final score (1st=11, 2nd=9, 3rd=7, 4th=5)
-            groupTeamAssignments.forEach((team: any, index: number) => {
-                const finalScore = [11, 9, 7, 5][index] || 0;
-                team.finalScore += finalScore;
-            });
-
-            groupResults[group.name] = groupTeamAssignments;
-        });
-
-        groups.forEach(group => {
-            const groupTeamAssignments = groupTeams.filter((gt: any) => gt.group_id === group.id)
-                .map((gt: any) => teamStats[gt.team_id])
-                .filter(Boolean);
-            
-            groupTeamAssignments.sort((a: any, b: any) => {
-                if (a.roundsWonStanding !== b.roundsWonStanding) return b.roundsWonStanding - a.roundsWonStanding;
-                const pointDiffA = a.totalPointsStanding - a.totalPointsAgainstStanding;
-                const pointDiffB = b.totalPointsStanding - b.totalPointsAgainstStanding;
-                if (pointDiffA !== pointDiffB) return pointDiffB - pointDiffA;
-                return 0;
-            });
-
-            // Assign final score (1st=10, 2nd=8, 3rd=6, 4th=4)
-            groupTeamAssignments.forEach((team: any, index: number) => {
-                const finalScore = [10, 8, 6, 4][index] || 0;
-                team.finalScore += finalScore;
-            });
-
-            groupResults[group.name] = groupTeamAssignments;
-        });
-
-        return teamStats;
-    }
-
-    sortTeamStatsByGroup(teamStats: Record<string, any>, groupTeams: any[], groupId: string, games?: any[]) {
-        const groupTeamIds = groupTeams.filter((gt: any) => gt.group_id === groupId).map((gt: any) => gt.team_id);
-                return groupTeamIds.map(teamId => teamStats[teamId]).filter(Boolean).sort((a: any, b: any) => {
-                    if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore;
-                    if (b.roundsWonSitting + b.roundsWonStanding !== a.roundsWonSitting + a.roundsWonStanding) {
-                        return b.roundsWonSitting + b.roundsWonStanding - (a.roundsWonSitting + a.roundsWonStanding);
-                    }
-                    const pointDiffA = (a.totalPointsSitting + a.totalPointsStanding) - (a.totalPointsAgainstSitting + a.totalPointsAgainstStanding);
-                    const pointDiffB = (b.totalPointsSitting + b.totalPointsStanding) - (b.totalPointsAgainstSitting + b.totalPointsAgainstStanding);
-                    if (pointDiffA !== pointDiffB) {
-                        return pointDiffB - pointDiffA;
-                    }
-                    
-                    // Head-to-head comparison: find the sitting game between teams a and b
-                    if (games) {
-                        const headToHeadGame = games.find((game: any) => 
-                            game.sitting === '1' && // sitting game
-                            ((game.team_1_id === a.id && game.team_2_id === b.id) || 
-                             (game.team_1_id === b.id && game.team_2_id === a.id))
-                        );
-                        
-                        if (headToHeadGame) {
-                            const team1TotalPoints = (parseInt(headToHeadGame.round1_points_team_1, 10) || 0) + (parseInt(headToHeadGame.round2_points_team_1, 10) || 0);
-                            const team2TotalPoints = (parseInt(headToHeadGame.round1_points_team_2, 10) || 0) + (parseInt(headToHeadGame.round2_points_team_2, 10) || 0);
-                            
-                            let gameWinner = null;
-                            if (team1TotalPoints !== team2TotalPoints) {
-                                gameWinner = team1TotalPoints > team2TotalPoints ? headToHeadGame.team_1_id : headToHeadGame.team_2_id;
-                            }
-                            
-                            // If there's a clear winner, rank the winner higher
-                            if (gameWinner) {
-                                console.log(`Head-to-head: ${a.name} vs ${b.name}, winner: ${gameWinner === a.id ? a.name : b.name}`);
-                                if (gameWinner === a.id) return -1; // a wins, a comes first
-                                if (gameWinner === b.id) return 1;  // b wins, b comes first
-                            }
-                        }
-                    }
-                    
-                    return 0;
-                });
-    }
+const awardPlacementScores = (
+  teamStats: TeamStatsMap,
+  groups: Group[],
+  groupTeams: GroupTeam[],
+  discipline: 'Sitting' | 'Standing',
+  placementScores: number[]
+): void => {
+  groups.forEach((group) => {
+    const ranked = teamStatsForGroup(teamStats, groupTeams, group.id).sort((a, b) => {
+      if (a[`roundsWon${discipline}`] !== b[`roundsWon${discipline}`]) {
+        return b[`roundsWon${discipline}`] - a[`roundsWon${discipline}`]
+      }
+      const pointDiffA = a[`totalPoints${discipline}`] - a[`totalPointsAgainst${discipline}`]
+      const pointDiffB = b[`totalPoints${discipline}`] - b[`totalPointsAgainst${discipline}`]
+      return pointDiffB - pointDiffA
+    })
+    ranked.forEach((stats, index) => {
+      stats.finalScore += placementScores[index] ?? 0
+    })
+  })
 }
 
-export default new RankingService();
+export const fillAllTeamStats = (
+  teamStats: TeamStatsMap,
+  games: Game[],
+  groups: Group[],
+  groupTeams: GroupTeam[]
+): TeamStatsMap => {
+  games.forEach((game) => {
+    const team1 = teamStats[game.team_1_id]
+    const team2 = teamStats[game.team_2_id]
+    if (!team1 || !team2) return
+
+    const points1 = scoreOf(game.round1_points_team_1) + scoreOf(game.round2_points_team_1)
+    const points2 = scoreOf(game.round1_points_team_2) + scoreOf(game.round2_points_team_2)
+
+    if (isSittingGame(game)) {
+      team1.roundsWonSitting += roundsWonBy(game, game.team_1_id)
+      team2.roundsWonSitting += roundsWonBy(game, game.team_2_id)
+      team1.totalPointsSitting += points1
+      team2.totalPointsSitting += points2
+      team1.totalPointsAgainstSitting += points2
+      team2.totalPointsAgainstSitting += points1
+    } else {
+      team1.roundsWonStanding += roundsWonBy(game, game.team_1_id)
+      team2.roundsWonStanding += roundsWonBy(game, game.team_2_id)
+      team1.totalPointsStanding += points1
+      team2.totalPointsStanding += points2
+      team1.totalPointsAgainstStanding += points2
+      team2.totalPointsAgainstStanding += points1
+    }
+  })
+
+  awardPlacementScores(teamStats, groups, groupTeams, 'Sitting', SITTING_PLACEMENT_SCORES)
+  awardPlacementScores(teamStats, groups, groupTeams, 'Standing', STANDING_PLACEMENT_SCORES)
+
+  return teamStats
+}
+
+// Winner of the sitting game between the two teams, if there is a clear one
+const headToHeadWinner = (a: TeamStats, b: TeamStats, games: Game[]): string | undefined => {
+  const game = games.find(
+    (g) =>
+      isSittingGame(g) &&
+      ((g.team_1_id === a.id && g.team_2_id === b.id) || (g.team_1_id === b.id && g.team_2_id === a.id))
+  )
+  if (!game) return undefined
+
+  const points1 = scoreOf(game.round1_points_team_1) + scoreOf(game.round2_points_team_1)
+  const points2 = scoreOf(game.round1_points_team_2) + scoreOf(game.round2_points_team_2)
+  if (points1 === points2) return undefined
+  return points1 > points2 ? game.team_1_id : game.team_2_id
+}
+
+export const sortTeamStatsByGroup = (
+  teamStats: TeamStatsMap,
+  groupTeams: GroupTeam[],
+  groupId?: string,
+  games?: Game[]
+): TeamStats[] =>
+  teamStatsForGroup(teamStats, groupTeams, groupId).sort((a, b) => {
+    if (a.finalScore !== b.finalScore) return b.finalScore - a.finalScore
+
+    const roundsWonA = a.roundsWonSitting + a.roundsWonStanding
+    const roundsWonB = b.roundsWonSitting + b.roundsWonStanding
+    if (roundsWonA !== roundsWonB) return roundsWonB - roundsWonA
+
+    const pointDiffA =
+      a.totalPointsSitting + a.totalPointsStanding - (a.totalPointsAgainstSitting + a.totalPointsAgainstStanding)
+    const pointDiffB =
+      b.totalPointsSitting + b.totalPointsStanding - (b.totalPointsAgainstSitting + b.totalPointsAgainstStanding)
+    if (pointDiffA !== pointDiffB) return pointDiffB - pointDiffA
+
+    const winner = games ? headToHeadWinner(a, b, games) : undefined
+    if (winner === a.id) return -1
+    if (winner === b.id) return 1
+    return 0
+  })

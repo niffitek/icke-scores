@@ -1,53 +1,29 @@
-import api from "@/lib/api";
+import api from '@/lib/api'
+import type { Cup } from '@/types/tournament'
 
-class CupsService {
-    static async getCups() {
-        const response = await api.get("?path=cups");
-        return response.data;
-    }
-
-    static async getCup(id: string) {
-        const response = await api.get("?path=cups");
-        const cups = response.data;
-        return cups.find((cup: any) => cup.id === id);
-    }
-
-    static async createCup(cup: any) {
-        const token = localStorage.getItem("adminToken");
-        const response = await api.post("?path=cups", cup, {
-            headers: {
-                "Authorization": `Bearer ${token}`
-            }
-        });
-        return response.data;
-    }
-
-    static async updateCup(id: string, cup: any) {
-        const token = localStorage.getItem("adminToken");
-        const cupData = { ...cup, id };
-        const response = await api.put("?path=cups", cupData, {
-            headers: {
-                "Authorization": `Bearer ${token}`
-            }
-        });
-        return response.data;
-    }
-
-    static async deleteCup(id: string) {
-        const token = localStorage.getItem("adminToken");
-        const response = await api.delete(`?path=cups&id=${id}`, {
-            headers: {
-                "Authorization": `Bearer ${token}`
-            }
-        });
-        return response.data;
-    }
-
-    static async getActiveCup() {
-        const response = await api.get("?path=cups");
-        const cups = response.data;
-        return cups.find((cup: any) => cup.state === "Vorrunde" || cup.state === "Finalrunde");
-    }
+export const getCups = async (): Promise<Cup[]> => {
+  const response = await api.get<Cup[]>('?path=cups')
+  return response.data
 }
 
-export default CupsService;
+export const getCup = async (id: string): Promise<Cup | undefined> => {
+  const cups = await getCups()
+  return cups.find((cup) => cup.id === id)
+}
+
+export const getActiveCup = async (): Promise<Cup | undefined> => {
+  const cups = await getCups()
+  return cups.find((cup) => cup.state === 'Vorrunde' || cup.state === 'Finalrunde')
+}
+
+export const createCup = async (cup: Cup): Promise<void> => {
+  await api.post('?path=cups', cup)
+}
+
+export const updateCup = async (id: string, cup: Partial<Cup>): Promise<void> => {
+  await api.put('?path=cups', { ...cup, id })
+}
+
+export const deleteCup = async (id: string): Promise<void> => {
+  await api.delete(`?path=cups&id=${id}`)
+}

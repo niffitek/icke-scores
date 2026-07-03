@@ -1,0 +1,14 @@
+#!/bin/sh
+# Husky pre-commit hook
+# Blocks the commit unless ESLint, TypeScript, and Jest all pass.
+
+echo "🔍 Running ESLint..."
+pnpm lint:check || exit 1
+
+echo "🔍 Running TypeScript check..."
+pnpm typecheck || exit 1
+
+echo "🧪 Running unit tests..."
+pnpm test || exit 1
+
+echo "✅ All quality gates passed!"
