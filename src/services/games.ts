@@ -2,7 +2,7 @@ import api from '@/lib/api'
 import type { Game } from '@/types/tournament'
 
 export const getGames = async (): Promise<Game[]> => {
-  const response = await api.get<Game[]>('?path=games')
+  const response = await api.get<Game[]>('/games')
   return response.data
 }
 
@@ -12,7 +12,7 @@ export const getGamesByCupId = async (cupId: string): Promise<Game[]> => {
 }
 
 export const createGame = async (game: Game): Promise<void> => {
-  await api.post('?path=games', game)
+  await api.post('/games', game)
 }
 
 export const createGames = async (games: Game[]): Promise<void> => {

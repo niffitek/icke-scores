@@ -2,7 +2,7 @@ import api from '@/lib/api'
 import type { Team } from '@/types/tournament'
 
 export const getTeams = async (): Promise<Team[]> => {
-  const response = await api.get<Team[]>('?path=teams')
+  const response = await api.get<Team[]>('/teams')
   return response.data
 }
 
@@ -12,13 +12,13 @@ export const getTeamsByCupId = async (cupId: string): Promise<Team[]> => {
 }
 
 export const createTeam = async (team: Team): Promise<void> => {
-  await api.post('?path=teams', team)
+  await api.post('/teams', team)
 }
 
 export const updateTeam = async (team: Partial<Team> & { id: string }): Promise<void> => {
-  await api.put('?path=teams', team)
+  await api.put(`/teams/${team.id}`, team)
 }
 
 export const deleteTeam = async (id: string): Promise<void> => {
-  await api.delete(`?path=teams&id=${id}`)
+  await api.delete(`/teams/${id}`)
 }

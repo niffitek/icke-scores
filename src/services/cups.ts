@@ -2,7 +2,7 @@ import api from '@/lib/api'
 import type { Cup } from '@/types/tournament'
 
 export const getCups = async (): Promise<Cup[]> => {
-  const response = await api.get<Cup[]>('?path=cups')
+  const response = await api.get<Cup[]>('/cups')
   return response.data
 }
 
@@ -17,13 +17,13 @@ export const getActiveCup = async (): Promise<Cup | undefined> => {
 }
 
 export const createCup = async (cup: Cup): Promise<void> => {
-  await api.post('?path=cups', cup)
+  await api.post('/cups', cup)
 }
 
 export const updateCup = async (id: string, cup: Partial<Cup>): Promise<void> => {
-  await api.put('?path=cups', { ...cup, id })
+  await api.put(`/cups/${id}`, cup)
 }
 
 export const deleteCup = async (id: string): Promise<void> => {
-  await api.delete(`?path=cups&id=${id}`)
+  await api.delete(`/cups/${id}`)
 }

@@ -15,7 +15,7 @@ const AdminLogin = () => {
   const handleLogin = async () => {
     setError('')
     try {
-      const res = await api.post<{ token?: string }>('/api/api.php?path=login', { password })
+      const res = await api.post<{ token?: string }>('/login', { password })
       if (res.data.token) {
         localStorage.setItem('adminToken', res.data.token)
         router.replace('/admin')
