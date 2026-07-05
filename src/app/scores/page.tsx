@@ -3,15 +3,19 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { FINALRUNDE_GROUPS, VORRUNDE_GROUPS } from '@/configs/constants'
+import { hasScores } from '@/lib/game-helpers'
 import { getActiveCup } from '@/services/cups'
 import { getGamesByCupId } from '@/services/games'
 import { getGroupsByCupId } from '@/services/groups'
 import { getGroupTeams } from '@/services/groupTeams'
-import { buildTeamStats, fillAllTeamStats, sortTeamStatsByGroup } from '@/services/ranking'
+import { buildTeamStats, fillAllTeamStats, sortTeamStatsByDiscipline, sortTeamStatsByGroup } from '@/services/ranking'
 import { getTeamsByCupId } from '@/services/teams'
-import type { CupState, TeamStats } from '@/types/tournament'
+import type { CupState, RoundName, TeamStats } from '@/types/tournament'
 
 const REFRESH_INTERVAL_MS = 30_000
+
+const DISCIPLINE_TABS = ['Gesamt', 'Sitzen', 'Stehen'] as const
+type DisciplineTab = (typeof DISCIPLINE_TABS)[number]
 
 type GroupStats = {
   name: string
@@ -22,6 +26,9 @@ const ScoresPage = () => {
   const [groupStats, setGroupStats] = useState<GroupStats[]>([])
   const [loading, setLoading] = useState(true)
   const [cupState, setCupState] = useState<CupState | ''>('')
+  // null = follow the cup's current phase; set once the user toggles
+  const [phaseOverride, setPhaseOverride] = useState<RoundName | null>(null)
+  const [disciplineTab, setDisciplineTab] = useState<DisciplineTab>('Gesamt')
 
   const fetchScores = useCallback(async () => {
     try {
@@ -33,8 +40,8 @@ const ScoresPage = () => {
       }
       setCupState(activeCup.state)
 
-      const relevantGroups = activeCup.state === 'Finalrunde' ? FINALRUNDE_GROUPS : VORRUNDE_GROUPS
-      const relevantRound = activeCup.state === 'Finalrunde' ? 'Finalrunde' : 'Vorrunde'
+      const phase: RoundName = phaseOverride ?? (activeCup.state === 'Finalrunde' ? 'Finalrunde' : 'Vorrunde')
+      const relevantGroups = phase === 'Finalrunde' ? FINALRUNDE_GROUPS : VORRUNDE_GROUPS
 
       const [groups, teams, groupTeams, games] = await Promise.all([
         getGroupsByCupId(activeCup.id),
@@ -44,14 +51,7 @@ const ScoresPage = () => {
       ])
 
       const filteredGroups = groups.filter((group) => relevantGroups.includes(group.name))
-      const finishedGames = games.filter(
-        (game) =>
-          game.round === relevantRound &&
-          (game.round1_points_team_1 != null ||
-            game.round1_points_team_2 != null ||
-            game.round2_points_team_1 != null ||
-            game.round2_points_team_2 != null)
-      )
+      const finishedGames = games.filter((game) => game.round === phase && hasScores(game))
 
       const teamStats = fillAllTeamStats(buildTeamStats(teams, groupTeams), finishedGames, filteredGroups, groupTeams)
 
@@ -71,7 +71,7 @@ const ScoresPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [phaseOverride])
 
   useEffect(() => {
     fetchScores()
@@ -79,10 +79,51 @@ const ScoresPage = () => {
     return () => clearInterval(interval)
   }, [fetchScores])
 
+  const currentPhase: RoundName = phaseOverride ?? (cupState === 'Finalrunde' ? 'Finalrunde' : 'Vorrunde')
+
+  const teamsForTab = (teams: TeamStats[]): TeamStats[] =>
+    disciplineTab === 'Gesamt'
+      ? teams
+      : sortTeamStatsByDiscipline(teams, disciplineTab === 'Sitzen' ? 'Sitting' : 'Standing')
+
   return (
     <section className="h-full flex flex-col">
       <div className="flex items-center justify-center gap-2 mb-2 flex-shrink-0">
-        <h1 className="text-xl font-semibold text-center">Team Ranglisten {cupState && `- ${cupState}`}</h1>
+        <h1 className="text-xl font-semibold text-center">Team Ranglisten {cupState && `- ${currentPhase}`}</h1>
+      </div>
+
+      <div className="flex items-center justify-center gap-4 mb-2 flex-shrink-0">
+        {/* Phase toggle, only once the Finalrunde exists */}
+        {cupState === 'Finalrunde' && (
+          <div className="flex gap-2">
+            {(['Vorrunde', 'Finalrunde'] as const).map((phase) => (
+              <button
+                key={phase}
+                onClick={() => setPhaseOverride(phase)}
+                className={`px-3 py-1 rounded text-sm ${
+                  currentPhase === phase ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                {phase}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Discipline tabs */}
+        <div className="flex gap-2">
+          {DISCIPLINE_TABS.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setDisciplineTab(tab)}
+              className={`px-3 py-1 rounded text-sm ${
+                disciplineTab === tab ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
       </div>
 
       {groupStats.length === 0 && !loading ? (
@@ -96,7 +137,7 @@ const ScoresPage = () => {
               <div key={group.name} className="bg-gray-50 rounded-lg p-3 flex flex-col min-h-0">
                 <h2 className="text-lg font-bold mb-1 text-gray-800 text-center flex-shrink-0">Gruppe {group.name}</h2>
                 <div className="flex-1 overflow-auto space-y-1 min-h-0">
-                  {group.teams.map((team, index) => {
+                  {teamsForTab(group.teams).map((team, index) => {
                     const sittingPointDiff = team.totalPointsSitting - team.totalPointsAgainstSitting
                     const standingPointDiff = team.totalPointsStanding - team.totalPointsAgainstStanding
 
@@ -119,7 +160,7 @@ const ScoresPage = () => {
                             {/* Sitting Stats */}
                             <div className="text-center min-w-0 flex-1 sm:flex-initial sm:min-w-20">
                               <div className="text-xs sm:text-sm font-semibold text-gray-700">Sitzen</div>
-                              <div className="text-sm sm:text-lg font-bold">{team.roundsWonSitting} Siege</div>
+                              <div className="text-sm sm:text-lg font-bold">{team.gamePointsSitting} Punkte</div>
                               <div className="text-xs sm:text-sm font-medium text-gray-600">
                                 {sittingPointDiff > 0 ? '+' : ''}
                                 {sittingPointDiff}
@@ -129,7 +170,7 @@ const ScoresPage = () => {
                             {/* Standing Stats */}
                             <div className="text-center min-w-0 flex-1 sm:flex-initial sm:min-w-20">
                               <div className="text-xs sm:text-sm font-semibold text-gray-700">Stehen</div>
-                              <div className="text-sm sm:text-lg font-bold">{team.roundsWonStanding} Siege</div>
+                              <div className="text-sm sm:text-lg font-bold">{team.gamePointsStanding} Punkte</div>
                               <div className="text-xs sm:text-sm font-medium text-gray-600">
                                 {standingPointDiff > 0 ? '+' : ''}
                                 {standingPointDiff}
