@@ -1,9 +1,13 @@
 import { type NextRequest, NextResponse } from 'next/server'
 
-import { neon } from '@neondatabase/serverless'
+import { neon, neonConfig } from '@neondatabase/serverless'
 
 // Lazy so importing a route module never needs DATABASE_URL (e.g. during `next build`)
-export const sql = () => neon(String(process.env.DATABASE_URL))
+export const sql = () => {
+  // Tests run against a local Postgres behind a Neon HTTP proxy (docker-compose.test.yml)
+  if (process.env.NEON_LOCAL_PROXY) neonConfig.fetchEndpoint = process.env.NEON_LOCAL_PROXY
+  return neon(String(process.env.DATABASE_URL))
+}
 
 export const json = (data: unknown, status = 200) => NextResponse.json(data, { status })
 

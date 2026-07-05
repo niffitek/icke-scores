@@ -20,13 +20,26 @@ export const GET = publicRoute(async () =>
 
 export const POST = adminRoute(async (req) => {
   const data = await req.json()
+  const sitting = Number(data.sitting)
+  const court = Number(data.court)
+  if (
+    !data.icke_cup_id ||
+    !data.team_1_id ||
+    !data.team_2_id ||
+    (data.round !== 'Vorrunde' && data.round !== 'Finalrunde') ||
+    (sitting !== 0 && sitting !== 1) ||
+    !(court >= 1 && court <= 6)
+  ) {
+    return json({ error: 'Missing or invalid fields' }, 400)
+  }
+  if (data.team_1_id === data.team_2_id) return json({ error: 'A team cannot play against itself' }, 400)
   const id = data.id || crypto.randomUUID()
   const db = sql()
   // Game plus its two empty rounds, atomically
   await db.transaction([
     db`INSERT INTO games (id, icke_cup_id, team_1_id, team_2_id, start_at, round, sitting, court)
        VALUES (${id}, ${data.icke_cup_id}, ${data.team_1_id}, ${data.team_2_id},
-               ${data.start_at}, ${data.round}, ${data.sitting}, ${data.court})`,
+               ${data.start_at}, ${data.round}, ${sitting}, ${court})`,
     db`INSERT INTO rounds (id, game_id, round_number)
        VALUES (${crypto.randomUUID()}, ${id}, 1)`,
     db`INSERT INTO rounds (id, game_id, round_number)

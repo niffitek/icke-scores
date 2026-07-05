@@ -1,0 +1,26 @@
+# Test database for `pnpm test:api`: Postgres behind a local Neon HTTP proxy,
+# so the @neondatabase/serverless driver used by the API routes works unchanged.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: main
+    volumes:
+      - ./db/schema.sql:/schema.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d main']
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  neon-proxy:
+    image: ghcr.io/timowilhelm/local-neon-http-proxy:main
+    environment:
+      PG_CONNECTION_STRING: postgres://postgres:postgres@db:5432/main
+    ports:
+      - '4444:4444'
+    depends_on:
+      db:
+        condition: service_healthy

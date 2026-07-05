@@ -10,6 +10,7 @@ export const createGroupTeam = async (groupTeam: GroupTeam): Promise<void> => {
   await api.post('/group-teams', groupTeam)
 }
 
-export const deleteGroupTeamsByTeamId = async (teamId: string): Promise<void> => {
-  await api.delete(`/group-teams?team_id=${teamId}`)
+// Scoped to one group so reassigning during the Finalrunde keeps the Vorrunde membership
+export const deleteGroupTeam = async (teamId: string, groupId: string): Promise<void> => {
+  await api.delete(`/group-teams?team_id=${teamId}&group_id=${groupId}`)
 }

@@ -9,6 +9,7 @@ export const GET = publicRoute(async (req) => {
 
 export const POST = adminRoute(async (req) => {
   const data = await req.json()
+  if (!data.id || !data.icke_cup_id || !data.name) return json({ error: 'Missing required fields' }, 400)
   await sql()`INSERT INTO "groups" (id, icke_cup_id, name)
               VALUES (${data.id}, ${data.icke_cup_id}, ${data.name})`
   return json({ success: true }, 201)

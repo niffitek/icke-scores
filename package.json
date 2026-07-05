@@ -11,6 +11,7 @@
     "lint:check": "eslint .",
     "typecheck": "pnpm exec tsc --noEmit",
     "test": "pnpm exec jest",
+    "test:api": "pnpm exec jest -c jest.api.config.ts",
     "test:watch": "pnpm exec jest --watch",
     "prepare": "husky"
   },
