@@ -10,66 +10,27 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  COURT_IS_SITTING,
-  FINALRUNDE_GROUPS,
-  MINUTES_PER_ROUND,
-  STATE_OPTIONS,
-  TEAMS_PER_CUP,
-  VORRUNDE_GROUPS,
-} from '@/configs/constants'
+import { FINALRUNDE_GROUPS, STATE_OPTIONS, TEAMS_PER_CUP, VORRUNDE_GROUPS } from '@/configs/constants'
 import { FINALRUNDE_SCHEDULE, VORRUNDE_SCHEDULE } from '@/configs/schedules'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { toLocalDateTimeString } from '@/lib/game-helpers'
 import { getCup, updateCup } from '@/services/cups'
 import { createGames, getGamesByCupId } from '@/services/games'
-import { createGroup, getGroups, getGroupsByCupId } from '@/services/groups'
+import { createGroup, getGroupsByCupId } from '@/services/groups'
 import { createGroupTeam, getGroupTeams } from '@/services/groupTeams'
-import { buildTeamStats, fillAllTeamStats, sortTeamStatsByGroup } from '@/services/ranking'
 import { getTeamsByCupId, updateTeam } from '@/services/teams'
-import type { Cup, Game, Group, GroupTeam, RoundName, Team } from '@/types/tournament'
+import {
+  buildScheduleGames,
+  computeFinalPlaces,
+  groupTeamsByGroupName,
+  hasDistinctPositions,
+  seedFinalGroups,
+} from '@/services/tournament'
+import type { Cup, GroupTeam, Team } from '@/types/tournament'
 
 import AuswertungTabContent from './AuswertungTabContent'
 import RoundGamesTab from './RoundGamesTab'
 import TeamsTabContent from './TeamsTabContent'
-
-// Build the games of one round from a schedule ("A1-A4" = group A team 1 vs team 4)
-const buildScheduleGames = (
-  schedule: string[][],
-  round: RoundName,
-  cupId: string,
-  startTime: string,
-  getTeamId: (group: string, position: number) => string | undefined
-): Game[] => {
-  const start = new Date()
-  const [hours, minutes] = startTime.split(':')
-  start.setHours(Number(hours), Number(minutes), 0, 0)
-
-  return schedule.flatMap((matches, roundIndex) => {
-    const roundTime = new Date(start.getTime() + roundIndex * MINUTES_PER_ROUND * 60_000)
-    return matches.flatMap((match, court) => {
-      const [left, right] = match.split('-')
-      const team1Id = getTeamId(left[0], Number(left[1]))
-      const team2Id = getTeamId(right[0], Number(right[1]))
-      if (!team1Id || !team2Id) return []
-      return [
-        {
-          id: crypto.randomUUID(),
-          team_1_id: team1Id,
-          team_2_id: team2Id,
-          ref_team_id: null,
-          points_team_1: 0,
-          points_team_2: 0,
-          start_at: toLocalDateTimeString(roundTime),
-          icke_cup_id: cupId,
-          round,
-          sitting: COURT_IS_SITTING[court] ? 1 : 0,
-          court: court + 1,
-        },
-      ]
-    })
-  })
-}
 
 const CupDetails = () => {
   useAdminAuth()
@@ -84,16 +45,24 @@ const CupDetails = () => {
   const [tab, setTab] = useState('teams')
   const [teams, setTeams] = useState<Team[]>([])
   const [showStartTimeDialog, setShowStartTimeDialog] = useState(false)
+  const [startDate, setStartDate] = useState(() => toLocalDateTimeString(new Date()).slice(0, 10))
   const [startTime, setStartTime] = useState('09:00')
   const [savingGames, setSavingGames] = useState(false)
   const [gameError, setGameError] = useState('')
   const [gameSuccess, setGameSuccess] = useState('')
-  const [groups, setGroups] = useState<Group[]>([])
-  const [groupTeams, setGroupTeams] = useState<GroupTeam[]>([])
-
   const [showFinalrundeDialog, setShowFinalrundeDialog] = useState(false)
+  const [finalrundeStartDate, setFinalrundeStartDate] = useState('')
   const [finalrundeStartTime, setFinalrundeStartTime] = useState('13:30')
   const [showCloseTournamentDialog, setShowCloseTournamentDialog] = useState(false)
+  // Earliest Vorrunde game date: locks team positions and defaults the Finalrunde date
+  const [vorrundeDate, setVorrundeDate] = useState('')
+
+  useEffect(() => {
+    getGamesByCupId(cupId).then((games) => {
+      const dates = games.filter((game) => game.round === 'Vorrunde').map((game) => game.start_at.slice(0, 10))
+      setVorrundeDate(dates.sort()[0] ?? '')
+    })
+  }, [cupId, cup?.state])
 
   const refreshTeams = useCallback(async () => {
     try {
@@ -110,8 +79,6 @@ const CupDetails = () => {
   useEffect(() => {
     refreshCup()
     refreshTeams()
-    getGroups().then(setGroups)
-    getGroupTeams().then(setGroupTeams)
   }, [refreshCup, refreshTeams])
 
   useEffect(() => {
@@ -152,30 +119,38 @@ const CupDetails = () => {
     }
   }
 
-  // Group teams by Vorrunde group name, sorted by name for consistent numbering
-  const getGroupedTeams = (): Partial<Record<string, Team[]>> => {
-    const grouped: Partial<Record<string, Team[]>> = Object.fromEntries(VORRUNDE_GROUPS.map((name) => [name, []]))
-    teams.forEach((team) => {
-      const groupTeam = groupTeams.find((gt) => gt.team_id === team.id)
-      const group = groupTeam && groups.find((g) => g.id === groupTeam.group_id)
-      if (group) grouped[group.name]?.push(team)
-    })
-    Object.values(grouped).forEach((groupedTeams) => groupedTeams?.sort((a, b) => a.name.localeCompare(b.name)))
-    return grouped
-  }
-
   const handleCreateGames = async () => {
     if (!cup) return
     setSavingGames(true)
     setGameError('')
     setGameSuccess('')
     try {
-      await refreshTeams()
-      const grouped = getGroupedTeams()
+      // Validate against fresh data — group assignments may have changed since mount
+      const [freshTeams, freshGroups, freshGroupTeams, existingGames] = await Promise.all([
+        getTeamsByCupId(cupId),
+        getGroupsByCupId(cupId),
+        getGroupTeams(),
+        getGamesByCupId(cupId),
+      ])
+      setTeams(freshTeams)
+      if (existingGames.some((game) => game.round === 'Vorrunde')) {
+        setGameError('Vorrunden-Spiele existieren bereits.')
+        return
+      }
+      const grouped = groupTeamsByGroupName(freshTeams, freshGroups, freshGroupTeams, VORRUNDE_GROUPS)
+      if (VORRUNDE_GROUPS.some((name) => grouped[name]?.length !== 4)) {
+        setGameError('Jede Gruppe braucht genau 4 Teams, bevor der Spielplan erstellt werden kann.')
+        return
+      }
+      if (VORRUNDE_GROUPS.some((name) => !hasDistinctPositions(grouped[name] ?? []))) {
+        setGameError('Jedes Team braucht eine eindeutige Position 1-4 innerhalb seiner Gruppe.')
+        return
+      }
       const games = buildScheduleGames(
         VORRUNDE_SCHEDULE,
         'Vorrunde',
         cupId,
+        startDate,
         startTime,
         (group, position) => grouped[group]?.at(position - 1)?.id
       )
@@ -197,43 +172,33 @@ const CupDetails = () => {
     setGameError('')
     setGameSuccess('')
     try {
-      const [allGames, allTeams, cupGroups] = await Promise.all([
+      const [allGames, allTeams, cupGroups, allGroupTeams] = await Promise.all([
         getGamesByCupId(cupId),
         getTeamsByCupId(cupId),
         getGroupsByCupId(cupId),
+        getGroupTeams(),
       ])
+      if (
+        allGames.some((game) => game.round === 'Finalrunde') ||
+        cupGroups.some((g) => FINALRUNDE_GROUPS.includes(g.name))
+      ) {
+        setGameError('Die Finalrunde existiert bereits.')
+        return
+      }
       const vorrundeGames = allGames.filter((game) => game.round === 'Vorrunde')
 
-      const teamStats = fillAllTeamStats(buildTeamStats(allTeams, groupTeams), vorrundeGames, cupGroups, groupTeams)
-
-      const rankingsByGroup = VORRUNDE_GROUPS.map((name) => {
-        const group = cupGroups.find((g) => g.name === name)
-        return sortTeamStatsByGroup(teamStats, groupTeams, group?.id, vorrundeGames)
-      })
-
-      // Group E gets the group winners, F the runners-up, G the thirds, H the fourths
-      const newGroups: Group[] = FINALRUNDE_GROUPS.map((name) => ({
-        id: crypto.randomUUID(),
-        icke_cup_id: cupId,
-        name,
-      }))
+      const { newGroups, assignments } = seedFinalGroups(cupId, allTeams, vorrundeGames, cupGroups, allGroupTeams)
       await Promise.all(newGroups.map((group) => createGroup(group)))
-
-      const groupAssignments = newGroups.flatMap((group, position) =>
-        rankingsByGroup.flatMap((ranking) => {
-          const stats = ranking.at(position)
-          return stats ? [{ group_id: group.id, team_id: stats.id }] : []
-        })
-      )
-      await Promise.all(groupAssignments.map((assignment) => createGroupTeam(assignment)))
+      await Promise.all(assignments.map((assignment) => createGroupTeam(assignment)))
 
       const assignmentsByGroupName: Partial<Record<string, GroupTeam[]>> = Object.fromEntries(
-        newGroups.map((group) => [group.name, groupAssignments.filter((gt) => gt.group_id === group.id)])
+        newGroups.map((group) => [group.name, assignments.filter((gt) => gt.group_id === group.id)])
       )
       const finalGames = buildScheduleGames(
         FINALRUNDE_SCHEDULE,
         'Finalrunde',
         cupId,
+        finalrundeStartDate || vorrundeDate || toLocalDateTimeString(new Date()).slice(0, 10),
         finalrundeStartTime,
         (group, position) => assignmentsByGroupName[group]?.at(position - 1)?.team_id
       )
@@ -257,34 +222,25 @@ const CupDetails = () => {
     setGameError('')
     setGameSuccess('')
     try {
-      const [allGames, allTeams, cupGroups] = await Promise.all([
+      const [allGames, allTeams, cupGroups, allGroupTeams] = await Promise.all([
         getGamesByCupId(cupId),
         getTeamsByCupId(cupId),
         getGroupsByCupId(cupId),
+        getGroupTeams(),
       ])
       const finalrundeGames = allGames.filter((game) => game.round === 'Finalrunde')
 
-      const teamStats = fillAllTeamStats(buildTeamStats(allTeams, groupTeams), finalrundeGames, cupGroups, groupTeams)
-
-      // Places 1-4 come from group E, 5-8 from F, 9-12 from G, 13-16 from H
-      const finalPlaceUpdates = FINALRUNDE_GROUPS.flatMap((name, groupIndex) => {
-        const group = cupGroups.find((g) => g.name === name)
-        const ranking = sortTeamStatsByGroup(teamStats, groupTeams, group?.id, finalrundeGames)
-        return ranking.map((stats, index) => {
-          const dbTeam = allTeams.find((team) => team.id === stats.id)
-          return {
-            id: stats.id,
-            name: dbTeam?.name ?? stats.name,
-            contact: dbTeam?.contact ?? '',
-            final_place: groupIndex * 4 + index + 1,
-          }
+      const finalPlaces = computeFinalPlaces(allTeams, finalrundeGames, cupGroups, allGroupTeams)
+      await Promise.all(
+        finalPlaces.map(({ id, final_place }) => {
+          const dbTeam = allTeams.find((team) => team.id === id)
+          return updateTeam({ id, name: dbTeam?.name ?? '', contact: dbTeam?.contact ?? '', final_place })
         })
-      })
-
-      await Promise.all(finalPlaceUpdates.map((team) => updateTeam(team)))
+      )
       await updateCup(cup.id, { ...cup, state: 'Abgeschlossen' })
       setGameSuccess('Turnier abgeschlossen und Platzierungen gespeichert!')
       refreshCup()
+      refreshTeams() // Auswertung tab needs the freshly written final_place values
       setShowCloseTournamentDialog(false)
     } catch (err) {
       setGameError('Fehler bei der Auswertung der Finalrunde.')
@@ -330,6 +286,15 @@ const CupDetails = () => {
                 </DialogHeader>
                 <div className="flex flex-col gap-4 mt-2">
                   <label className="font-medium">
+                    Datum
+                    <input
+                      type="date"
+                      className="border rounded px-2 py-1 mt-1"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </label>
+                  <label className="font-medium">
                     Startzeit
                     <input
                       type="time"
@@ -365,6 +330,15 @@ const CupDetails = () => {
                 </DialogHeader>
                 <div className="flex flex-col gap-4 mt-2">
                   <p>Bitte bestätigen Sie, dass alle Vorrundenspiele korrekt ausgefüllt sind.</p>
+                  <label className="font-medium">
+                    Datum der Finalrunde
+                    <input
+                      type="date"
+                      className="border rounded px-2 py-1 mt-1"
+                      value={finalrundeStartDate || vorrundeDate}
+                      onChange={(e) => setFinalrundeStartDate(e.target.value)}
+                    />
+                  </label>
                   <label className="font-medium">
                     Startzeit der Finalrunde
                     <input
@@ -480,13 +454,13 @@ const CupDetails = () => {
           <TabsTrigger value="auswertung">Auswertung</TabsTrigger>
         </TabsList>
         <TabsContent value="teams">
-          <TeamsTabContent cupId={cupId} cup={cup} onTeamsChange={refreshTeams} />
+          <TeamsTabContent cupId={cupId} cup={cup} locked={vorrundeDate !== ''} onTeamsChange={refreshTeams} />
         </TabsContent>
         <TabsContent value="vorrunde">
-          <RoundGamesTab cupId={cupId} round="Vorrunde" />
+          <RoundGamesTab cupId={cupId} round="Vorrunde" cupState={cup.state} />
         </TabsContent>
         <TabsContent value="finalrunde">
-          <RoundGamesTab cupId={cupId} round="Finalrunde" />
+          <RoundGamesTab cupId={cupId} round="Finalrunde" cupState={cup.state} />
         </TabsContent>
         <TabsContent value="auswertung">
           <AuswertungTabContent cupId={cupId} teams={teams} />

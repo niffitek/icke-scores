@@ -8,17 +8,21 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { FINALRUNDE_GROUPS, TEAMS_PER_CUP, VORRUNDE_GROUPS } from '@/configs/constants'
 import { getGroupsByCupId } from '@/services/groups'
-import { createGroupTeam, deleteGroupTeamsByTeamId, getGroupTeams } from '@/services/groupTeams'
+import { createGroupTeam, deleteGroupTeam, getGroupTeams } from '@/services/groupTeams'
 import { createTeam, deleteTeam, getTeams, updateTeam } from '@/services/teams'
 import type { Cup, Group, GroupTeam, Team } from '@/types/tournament'
+
+const POSITIONS = [1, 2, 3, 4]
 
 type TeamsTabContentProps = {
   cupId: string
   cup: Cup
+  // Vorrunde games exist: group + position feed the fixed schedule and must not move anymore
+  locked: boolean
   onTeamsChange?: () => void
 }
 
-const TeamsTabContent = ({ cupId, cup, onTeamsChange }: TeamsTabContentProps) => {
+const TeamsTabContent = ({ cupId, cup, locked, onTeamsChange }: TeamsTabContentProps) => {
   const relevantGroups = cup.state === 'Finalrunde' ? FINALRUNDE_GROUPS : VORRUNDE_GROUPS
 
   const [teams, setTeams] = useState<Team[]>([])
@@ -33,6 +37,7 @@ const TeamsTabContent = ({ cupId, cup, onTeamsChange }: TeamsTabContentProps) =>
   const [teamDeleteLoading, setTeamDeleteLoading] = useState('')
   const [groups, setGroups] = useState<Group[]>([])
   const [selectedGroup, setSelectedGroup] = useState(relevantGroups[0])
+  const [selectedPosition, setSelectedPosition] = useState(POSITIONS[0])
   const [editSelectedGroup, setEditSelectedGroup] = useState(relevantGroups[0])
   const [groupTeams, setGroupTeams] = useState<GroupTeam[]>([])
 
@@ -42,11 +47,12 @@ const TeamsTabContent = ({ cupId, cup, onTeamsChange }: TeamsTabContentProps) =>
     onTeamsChange?.()
   }, [onTeamsChange])
 
+  // Re-fetch on phase change: starting the Finalrunde creates groups E-H
   useEffect(() => {
     getGroupsByCupId(cupId).then(setGroups)
     getTeams().then(setTeams)
     getGroupTeams().then(setGroupTeams)
-  }, [cupId])
+  }, [cupId, cup.state])
 
   const getTeamGroupName = (teamId: string): string => {
     const assignments = groupTeams.filter((gt) => gt.team_id === teamId)
@@ -68,8 +74,18 @@ const TeamsTabContent = ({ cupId, cup, onTeamsChange }: TeamsTabContentProps) =>
     setTeamEditLoading(true)
     setTeamEditError('')
     try {
-      await updateTeam({ id: editTeam.id, name: editTeam.name, contact: editTeam.contact })
-      await deleteGroupTeamsByTeamId(editTeam.id)
+      await updateTeam({
+        id: editTeam.id,
+        name: editTeam.name,
+        contact: editTeam.contact,
+        place: Number(editTeam.place) || undefined,
+      })
+      // Only touch the membership of the current phase (A-D or E-H)
+      const currentMembership = groupTeams.find(
+        (gt) =>
+          gt.team_id === editTeam.id && groups.some((g) => g.id === gt.group_id && relevantGroups.includes(g.name))
+      )
+      if (currentMembership) await deleteGroupTeam(editTeam.id, currentMembership.group_id)
       await assignTeamToGroup(editTeam.id, editSelectedGroup)
       setShowEditDialog(false)
       setEditTeam(null)
@@ -103,7 +119,7 @@ const TeamsTabContent = ({ cupId, cup, onTeamsChange }: TeamsTabContentProps) =>
         id: newId,
         name: newTeam.name,
         contact: newTeam.contact,
-        place: teams.length + 1,
+        place: selectedPosition,
         icke_cup_id: cup.id,
       })
       await assignTeamToGroup(newId, selectedGroup)
@@ -133,7 +149,7 @@ const TeamsTabContent = ({ cupId, cup, onTeamsChange }: TeamsTabContentProps) =>
         return index === -1 ? relevantGroups.length : index
       }
       const orderDiff = orderOf(a.id) - orderOf(b.id)
-      return orderDiff !== 0 ? orderDiff : a.name.localeCompare(b.name)
+      return orderDiff || (Number(a.place) || 0) - (Number(b.place) || 0) || a.name.localeCompare(b.name)
     })
 
   return (
@@ -175,6 +191,20 @@ const TeamsTabContent = ({ cupId, cup, onTeamsChange }: TeamsTabContentProps) =>
                   ))}
                 </select>
               </label>
+              <label className="font-medium">
+                Position
+                <select
+                  className="border rounded px-2 py-1 mt-1"
+                  value={selectedPosition}
+                  onChange={(e) => setSelectedPosition(Number(e.target.value))}
+                >
+                  {POSITIONS.map((position) => (
+                    <option key={position} value={position}>
+                      {position}
+                    </option>
+                  ))}
+                </select>
+              </label>
               {createError && <p className="text-red-500 text-sm">{createError}</p>}
             </div>
             <DialogFooter>
@@ -191,6 +221,7 @@ const TeamsTabContent = ({ cupId, cup, onTeamsChange }: TeamsTabContentProps) =>
             <TableHead>Name</TableHead>
             <TableHead>Kontakt</TableHead>
             <TableHead>Gruppe</TableHead>
+            <TableHead>Position</TableHead>
             <TableHead className="w-24 text-right"></TableHead>
           </TableRow>
         </TableHeader>
@@ -200,6 +231,7 @@ const TeamsTabContent = ({ cupId, cup, onTeamsChange }: TeamsTabContentProps) =>
               <TableCell>{team.name}</TableCell>
               <TableCell>{team.contact}</TableCell>
               <TableCell>{getTeamGroupName(team.id)}</TableCell>
+              <TableCell>{Number(team.place) || '-'}</TableCell>
               <TableCell className="text-right">
                 <Dialog
                   open={showEditDialog && editTeam?.id === team.id}
@@ -213,7 +245,8 @@ const TeamsTabContent = ({ cupId, cup, onTeamsChange }: TeamsTabContentProps) =>
                       size="icon"
                       className="p-2 mr-2"
                       onClick={() => {
-                        setEditTeam({ ...team })
+                        // Seed a missing position with the displayed default so saving persists it
+                        setEditTeam({ ...team, place: Number(team.place) || POSITIONS[0] })
                         const groupName = getTeamGroupName(team.id)
                         setEditSelectedGroup(groupName === '-' ? relevantGroups[0] : groupName)
                         setShowEditDialog(true)
@@ -244,6 +277,7 @@ const TeamsTabContent = ({ cupId, cup, onTeamsChange }: TeamsTabContentProps) =>
                           className="border rounded px-2 py-1 mt-1"
                           value={editSelectedGroup}
                           onChange={(e) => setEditSelectedGroup(e.target.value)}
+                          disabled={locked}
                         >
                           {relevantGroups.map((group) => (
                             <option key={group} value={group}>
@@ -252,6 +286,26 @@ const TeamsTabContent = ({ cupId, cup, onTeamsChange }: TeamsTabContentProps) =>
                           ))}
                         </select>
                       </label>
+                      <label className="font-medium">
+                        Position
+                        <select
+                          className="border rounded px-2 py-1 mt-1"
+                          value={Number(editTeam?.place) || POSITIONS[0]}
+                          onChange={(e) => editTeam && setEditTeam({ ...editTeam, place: Number(e.target.value) })}
+                          disabled={locked}
+                        >
+                          {POSITIONS.map((position) => (
+                            <option key={position} value={position}>
+                              {position}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {locked && (
+                        <p className="text-sm text-gray-500">
+                          Gruppe und Position sind gesperrt, da der Spielplan bereits erstellt wurde.
+                        </p>
+                      )}
                       {teamEditError && <p className="text-red-500 text-sm">{teamEditError}</p>}
                     </div>
                     <DialogFooter>

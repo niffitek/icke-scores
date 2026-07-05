@@ -10,7 +10,7 @@ import { compareByStartTimeAndCourt, scoreOf } from '@/lib/game-helpers'
 import { getGames } from '@/services/games'
 import { getRoundsByGameId, updateRound } from '@/services/rounds'
 import { getTeams } from '@/services/teams'
-import type { Game, RoundName } from '@/types/tournament'
+import type { CupState, Game, RoundName } from '@/types/tournament'
 
 type DisplayGame = Game & {
   teamA: string
@@ -50,7 +50,9 @@ const toDisplayGame = (game: Game, teamNames: Map<string, string>): DisplayGame 
   }
 }
 
-const RoundGamesTab = ({ cupId, round }: { cupId: string; round: RoundName }) => {
+// cupState is only a reload trigger: creating games flips the cup state while
+// this tab may already be mounted and would otherwise keep its stale empty list
+const RoundGamesTab = ({ cupId, round, cupState }: { cupId: string; round: RoundName; cupState: CupState }) => {
   const [games, setGames] = useState<DisplayGame[]>([])
   const [loading, setLoading] = useState(true)
   const [editGame, setEditGame] = useState<EditableGame | null>(null)
@@ -65,7 +67,9 @@ const RoundGamesTab = ({ cupId, round }: { cupId: string; round: RoundName }) =>
       .map((game) => toDisplayGame(game, teamNames))
       .sort(compareByStartTimeAndCourt)
     setGames(mapped)
-  }, [cupId, round])
+    // cupState is intentionally a reload trigger (see component comment)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cupId, round, cupState])
 
   useEffect(() => {
     setLoading(true)

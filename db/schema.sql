@@ -23,6 +23,8 @@ CREATE TABLE teams (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
   contact     TEXT,
+  -- within-group position 1-4 ("A1" = place 1); drives the fixed schedule
+  place       INT,
   final_place INT,
   icke_cup_id TEXT NOT NULL REFERENCES icke_cups(id) ON DELETE CASCADE
 );
