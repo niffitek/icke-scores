@@ -66,8 +66,8 @@ export type TeamStats = {
   id: string
   name: string
   group?: string
-  roundsWonSitting: number
-  roundsWonStanding: number
+  gamePointsSitting: number
+  gamePointsStanding: number
   totalPointsSitting: number
   totalPointsStanding: number
   totalPointsAgainstSitting: number

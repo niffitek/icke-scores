@@ -2,6 +2,7 @@ import {
   compareByStartTimeAndCourt,
   enrichGames,
   getGameStatus,
+  hasScores,
   isSittingGame,
   scoreOf,
   toLocalDateTimeString,
@@ -39,6 +40,23 @@ describe('isSittingGame', () => {
     expect(isSittingGame(game({ sitting: 1 }))).toBe(true)
     expect(isSittingGame(game({ sitting: '0' }))).toBe(false)
     expect(isSittingGame(game({ sitting: 0 }))).toBe(false)
+  })
+})
+
+describe('hasScores', () => {
+  it('is false for untouched games — the API reports their default rounds as 0, not null', () => {
+    expect(hasScores(game({}))).toBe(false)
+    expect(hasScores(game({ round1_points_team_1: null, round2_points_team_2: null }))).toBe(false)
+    expect(
+      hasScores(
+        game({ round1_points_team_1: 0, round1_points_team_2: 0, round2_points_team_1: 0, round2_points_team_2: 0 })
+      )
+    ).toBe(false)
+  })
+
+  it('is true once any Satz has points, in either API value shape', () => {
+    expect(hasScores(game({ round1_points_team_1: 21 }))).toBe(true)
+    expect(hasScores(game({ round2_points_team_2: '21' }))).toBe(true)
   })
 })
 

@@ -7,6 +7,17 @@ export const scoreOf = (value: Score | undefined): number => Number(value ?? 0) 
 
 export const isSittingGame = (game: Game): boolean => String(game.sitting) === '1'
 
+// A game counts as played once any points were scored — an untouched game must
+// not rank as a 0:0 draw. A null check cannot work: games are created with two
+// 0:0 rounds, so the API reports 0 (not null) for untouched games.
+// ponytail: a genuine both-Sätze-0:0 game counts as unplayed; make the rounds
+// points columns nullable if that ever matters.
+export const hasScores = (game: Game): boolean =>
+  scoreOf(game.round1_points_team_1) > 0 ||
+  scoreOf(game.round1_points_team_2) > 0 ||
+  scoreOf(game.round2_points_team_1) > 0 ||
+  scoreOf(game.round2_points_team_2) > 0
+
 export const getGameStatus = (game: Game, now: Date = new Date()): GameStatus => {
   const start = new Date(game.start_at).getTime()
   if (now.getTime() < start) return 'upcoming'
