@@ -8,31 +8,31 @@ import {
   enrichGames,
   GAME_STATUS_COLORS,
   GAME_STATUS_LABELS,
+  hasScores,
 } from '@/lib/game-helpers'
 import { getActiveCup } from '@/services/cups'
 import { getGamesByCupId } from '@/services/games'
 import { getTeamsByCupId } from '@/services/teams'
+import type { GameStatus, Team } from '@/types/tournament'
 
 const REFRESH_INTERVAL_MS = 30_000
 
-type GameFilter = 'all' | 'upcoming' | 'finished'
+type GameFilter = 'all' | GameStatus
 
+// Labels come from GAME_STATUS_LABELS so chips and badges always match
 const FILTER_OPTIONS: { value: GameFilter; label: string }[] = [
   { value: 'all', label: 'Alle' },
-  { value: 'upcoming', label: 'Anstehend' },
-  { value: 'finished', label: 'Beendet' },
+  { value: 'upcoming', label: GAME_STATUS_LABELS.upcoming },
+  { value: 'live', label: GAME_STATUS_LABELS.live },
+  { value: 'finished', label: GAME_STATUS_LABELS.finished },
 ]
-
-const hasScores = (game: EnrichedGame): boolean =>
-  game.round1_points_team_1 != null ||
-  game.round1_points_team_2 != null ||
-  game.round2_points_team_1 != null ||
-  game.round2_points_team_2 != null
 
 const GamesPage = () => {
   const [games, setGames] = useState<EnrichedGame[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<GameFilter>('all')
+  const [teamFilter, setTeamFilter] = useState('') // '' = alle Teams
 
   const fetchGames = useCallback(async () => {
     try {
@@ -42,8 +42,9 @@ const GamesPage = () => {
         return
       }
 
-      const [teams, allGames] = await Promise.all([getTeamsByCupId(activeCup.id), getGamesByCupId(activeCup.id)])
-      setGames(enrichGames(allGames.sort(compareByStartTimeAndCourt), teams))
+      const [cupTeams, allGames] = await Promise.all([getTeamsByCupId(activeCup.id), getGamesByCupId(activeCup.id)])
+      setTeams(cupTeams)
+      setGames(enrichGames(allGames.sort(compareByStartTimeAndCourt), cupTeams))
     } catch (error) {
       console.error('Error fetching games:', error)
     } finally {
@@ -57,7 +58,9 @@ const GamesPage = () => {
     return () => clearInterval(interval)
   }, [fetchGames])
 
-  const filteredGames = games.filter((game) => filter === 'all' || game.status === filter)
+  const filteredGames = games
+    .filter((game) => filter === 'all' || game.status === filter)
+    .filter((game) => !teamFilter || game.team_1_id === teamFilter || game.team_2_id === teamFilter)
 
   return (
     <section>
@@ -67,7 +70,22 @@ const GamesPage = () => {
         </div>
 
         {/* Filter buttons */}
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <select
+            className="border rounded px-2 py-1 text-sm"
+            value={teamFilter}
+            onChange={(e) => setTeamFilter(e.target.value)}
+            aria-label="Nach Team filtern"
+          >
+            <option value="">Alle Teams</option>
+            {[...teams]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+          </select>
           {FILTER_OPTIONS.map((option) => (
             <button
               key={option.value}
