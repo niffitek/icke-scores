@@ -1,7 +1,7 @@
 import axios, { type AxiosError } from 'axios'
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: process.env.NEXT_PUBLIC_API_URL ?? '/api',
 })
 
 // A 401 from the login attempt itself must not reload the page, or the
