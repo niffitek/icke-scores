@@ -312,7 +312,6 @@ const CupDetails = () => {
                   </Button>
                 </DialogFooter>
                 {gameError && <p className="text-red-500 text-sm mt-2">{gameError}</p>}
-                {gameSuccess && <p className="text-green-600 text-sm mt-2">{gameSuccess}</p>}
               </DialogContent>
             </Dialog>
           )}
@@ -357,7 +356,6 @@ const CupDetails = () => {
                   </Button>
                 </DialogFooter>
                 {gameError && <p className="text-red-500 text-sm mt-2">{gameError}</p>}
-                {gameSuccess && <p className="text-green-600 text-sm mt-2">{gameSuccess}</p>}
               </DialogContent>
             </Dialog>
           )}
@@ -444,6 +442,7 @@ const CupDetails = () => {
           <p>
             <span className="font-medium">Status:</span> {cup.state}
           </p>
+          {gameSuccess && <p className="text-green-600 text-sm mt-2">{gameSuccess}</p>}
         </div>
       )}
       <Tabs value={tab} className="mb-6" onValueChange={setTab}>

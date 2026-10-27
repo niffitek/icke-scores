@@ -55,13 +55,21 @@ const TeamsTabContent = ({ cupId, cup, locked, onTeamsChange }: TeamsTabContentP
     getGroupTeams().then(setGroupTeams)
   }, [cupId, cup.state])
 
-  const getTeamGroupName = (teamId: string): string => {
+  const groupNameIn = (teamId: string, groupNames: readonly string[]): string => {
     const assignments = groupTeams.filter((gt) => gt.team_id === teamId)
     const match = assignments
       .map((gt) => groups.find((group) => group.id === gt.group_id))
-      .find((group) => group && relevantGroups.includes(group.name))
+      .find((group) => group && groupNames.includes(group.name))
     return match?.name ?? '-'
   }
+  const getTeamGroupName = (teamId: string): string => groupNameIn(teamId, relevantGroups)
+
+  // Team.place is the Vorrunde position. In E-H the position is the Vorrunde
+  // group the team came from (seedFinalGroups fills E1 from A, E2 from B, ...)
+  const positionOf = (team: Team): number =>
+    relevantGroups === FINALRUNDE_GROUPS
+      ? VORRUNDE_GROUPS.indexOf(groupNameIn(team.id, VORRUNDE_GROUPS)) + 1
+      : Number(team.place) || 0
 
   const assignTeamToGroup = async (teamId: string, groupName: string) => {
     // Fresh fetch: right after mount the groups state can still be empty, and a
@@ -151,7 +159,7 @@ const TeamsTabContent = ({ cupId, cup, locked, onTeamsChange }: TeamsTabContentP
         return index === -1 ? relevantGroups.length : index
       }
       const orderDiff = orderOf(a.id) - orderOf(b.id)
-      return orderDiff || (Number(a.place) || 0) - (Number(b.place) || 0) || a.name.localeCompare(b.name)
+      return orderDiff || positionOf(a) - positionOf(b) || a.name.localeCompare(b.name)
     })
 
   return (
@@ -233,7 +241,7 @@ const TeamsTabContent = ({ cupId, cup, locked, onTeamsChange }: TeamsTabContentP
               <TableCell>{team.name}</TableCell>
               <TableCell>{team.contact}</TableCell>
               <TableCell>{getTeamGroupName(team.id)}</TableCell>
-              <TableCell>{Number(team.place) || '-'}</TableCell>
+              <TableCell>{positionOf(team) || '-'}</TableCell>
               <TableCell className="text-right">
                 <Dialog
                   open={showEditDialog && editTeam?.id === team.id}
@@ -292,7 +300,7 @@ const TeamsTabContent = ({ cupId, cup, locked, onTeamsChange }: TeamsTabContentP
                         Position
                         <select
                           className="border rounded px-2 py-1 mt-1"
-                          value={Number(editTeam?.place) || POSITIONS[0]}
+                          value={(editTeam && positionOf(editTeam)) || POSITIONS[0]}
                           onChange={(e) => editTeam && setEditTeam({ ...editTeam, place: Number(e.target.value) })}
                           disabled={locked}
                         >

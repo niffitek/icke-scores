@@ -76,10 +76,10 @@ const Home = () => {
 
       const [teams, allGames] = await Promise.all([getTeamsByCupId(activeCup.id), getGamesByCupId(activeCup.id)])
 
-      const now = new Date()
-      const upcomingVorrunde = upcomingOf(allGames, 'Vorrunde', now)
-      const round: RoundName = upcomingVorrunde.length > 0 ? 'Vorrunde' : 'Finalrunde'
-      const upcoming = round === 'Vorrunde' ? upcomingVorrunde : upcomingOf(allGames, 'Finalrunde', now)
+      // The cup state decides the round, not the clock: a Vorrunde running late
+      // must not hide the Finalrunde once the admin has started it
+      const round: RoundName = activeCup.state === 'Finalrunde' ? 'Finalrunde' : 'Vorrunde'
+      const upcoming = upcomingOf(allGames, round, new Date())
 
       setCurrentRound(round)
       setGames(enrichGames(upcoming.sort(compareByStartTimeAndCourt), teams))

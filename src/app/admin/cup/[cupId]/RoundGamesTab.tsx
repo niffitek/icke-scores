@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { errorMessage } from '@/lib/api'
-import { compareByStartTimeAndCourt, scoreOf } from '@/lib/game-helpers'
+import { compareByStartTimeAndCourt, hasScores, scoreOf } from '@/lib/game-helpers'
 import { getGames } from '@/services/games'
 import { getRoundsByGameId, updateRound } from '@/services/rounds'
 import { getTeams } from '@/services/teams'
@@ -47,7 +47,8 @@ const toDisplayGame = (game: Game, teamNames: Map<string, string>): DisplayGame 
     round1Result: `${scoreOf(game.round1_points_team_1)} : ${scoreOf(game.round1_points_team_2)}`,
     round2Result: `${scoreOf(game.round2_points_team_1)} : ${scoreOf(game.round2_points_team_2)}`,
     totalResult: `${totalPoints1} : ${totalPoints2}`,
-    gameWinner: winnerId ? (teamNames.get(winnerId) ?? winnerId) : 'Unentschieden',
+    // an unplayed game has no winner yet, it is not a draw
+    gameWinner: !hasScores(game) ? '-' : winnerId ? (teamNames.get(winnerId) ?? winnerId) : 'Unentschieden',
   }
 }
 
@@ -114,9 +115,9 @@ const RoundGamesTab = ({ cupId, round, cupState }: { cupId: string; round: Round
           points_team_2: editGame.round2_points_team_2,
         })
       }
+      await loadGames()
       setShowEditDialog(false)
       setEditGame(null)
-      await loadGames()
     } catch (err) {
       setSaveError(errorMessage(err, 'Fehler beim Speichern des Spiels'))
     } finally {

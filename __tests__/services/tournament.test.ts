@@ -147,10 +147,12 @@ describe('seedFinalGroups', () => {
       const group = newGroups.find((g) => g.name === name)
       return assignments.filter((a) => a.group_id === group?.id).map((a) => a.team_id)
     }
-    expect(membersOf('E').sort()).toEqual(['A1', 'B1', 'C1', 'D1'])
-    expect(membersOf('F').sort()).toEqual(['A2', 'B2', 'C2', 'D2'])
-    expect(membersOf('G').sort()).toEqual(['A3', 'B3', 'C3', 'D3'])
-    expect(membersOf('H').sort()).toEqual(['A4', 'B4', 'C4', 'D4'])
+    // Order matters, not just membership: E1 comes from A, E2 from B, ... The
+    // Finalrunde schedule and the admin "Position" column both rely on it.
+    expect(membersOf('E')).toEqual(['A1', 'B1', 'C1', 'D1'])
+    expect(membersOf('F')).toEqual(['A2', 'B2', 'C2', 'D2'])
+    expect(membersOf('G')).toEqual(['A3', 'B3', 'C3', 'D3'])
+    expect(membersOf('H')).toEqual(['A4', 'B4', 'C4', 'D4'])
   })
 
   it('is not fooled by unplayed games (a 0:0 "draw" would push A2 past A1)', () => {

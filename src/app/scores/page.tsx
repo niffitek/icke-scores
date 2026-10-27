@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { FINALRUNDE_GROUPS, VORRUNDE_GROUPS } from '@/configs/constants'
 import { hasScores } from '@/lib/game-helpers'
-import { getActiveCup } from '@/services/cups'
+import { getActiveCup, getCups } from '@/services/cups'
 import { getGamesByCupId } from '@/services/games'
 import { getGroupsByCupId } from '@/services/groups'
 import { getGroupTeams } from '@/services/groupTeams'
 import { buildTeamStats, fillAllTeamStats, sortTeamStatsByDiscipline, sortTeamStatsByGroup } from '@/services/ranking'
 import { getTeamsByCupId } from '@/services/teams'
-import type { CupState, RoundName, TeamStats } from '@/types/tournament'
+import type { CupState, RoundName, Team, TeamStats } from '@/types/tournament'
 
 const REFRESH_INTERVAL_MS = 30_000
 
@@ -22,6 +22,13 @@ type GroupStats = {
   teams: TeamStats[]
 }
 
+type FinalStandings = {
+  title: string
+  teams: Team[]
+}
+
+const pointsLabel = (points: number): string => `${points} ${points === 1 ? 'Punkt' : 'Punkte'}`
+
 const ScoresPage = () => {
   const [groupStats, setGroupStats] = useState<GroupStats[]>([])
   const [loading, setLoading] = useState(true)
@@ -29,6 +36,8 @@ const ScoresPage = () => {
   // null = follow the cup's current phase; set once the user toggles
   const [phaseOverride, setPhaseOverride] = useState<RoundName | null>(null)
   const [disciplineTab, setDisciplineTab] = useState<DisciplineTab>('Gesamt')
+  // Shown between cups: the final places of the last finished one
+  const [finalStandings, setFinalStandings] = useState<FinalStandings | null>(null)
 
   const fetchScores = useCallback(async () => {
     try {
@@ -36,8 +45,21 @@ const ScoresPage = () => {
       if (!activeCup) {
         setGroupStats([])
         setCupState('')
+        const lastFinished = (await getCups())
+          .filter((cup) => cup.state === 'Abgeschlossen')
+          .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+          .at(0)
+        const placedTeams = lastFinished
+          ? (await getTeamsByCupId(lastFinished.id))
+              .filter((team) => team.final_place != null && team.final_place !== '')
+              .sort((a, b) => Number(a.final_place) - Number(b.final_place))
+          : []
+        setFinalStandings(
+          lastFinished && placedTeams.length > 0 ? { title: lastFinished.title, teams: placedTeams } : null
+        )
         return
       }
+      setFinalStandings(null)
       setCupState(activeCup.state)
 
       const phase: RoundName = phaseOverride ?? (activeCup.state === 'Finalrunde' ? 'Finalrunde' : 'Vorrunde')
@@ -89,44 +111,61 @@ const ScoresPage = () => {
   return (
     <section className="h-full flex flex-col">
       <div className="flex items-center justify-center gap-2 mb-2 flex-shrink-0">
-        <h1 className="text-xl font-semibold text-center">Team Ranglisten {cupState && `- ${currentPhase}`}</h1>
+        <h1 className="text-xl font-semibold text-center">
+          {finalStandings
+            ? `Endplatzierungen - ${finalStandings.title}`
+            : `Team Ranglisten ${cupState && `- ${currentPhase}`}`}
+        </h1>
       </div>
 
-      <div className="flex items-center justify-center gap-4 mb-2 flex-shrink-0">
-        {/* Phase toggle, only once the Finalrunde exists */}
-        {cupState === 'Finalrunde' && (
+      {!finalStandings && (
+        <div className="flex items-center justify-center gap-4 mb-2 flex-shrink-0">
+          {/* Phase toggle, only once the Finalrunde exists */}
+          {cupState === 'Finalrunde' && (
+            <div className="flex gap-2">
+              {(['Vorrunde', 'Finalrunde'] as const).map((phase) => (
+                <button
+                  key={phase}
+                  onClick={() => setPhaseOverride(phase)}
+                  className={`px-3 py-1 rounded text-sm ${
+                    currentPhase === phase ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  {phase}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Discipline tabs */}
           <div className="flex gap-2">
-            {(['Vorrunde', 'Finalrunde'] as const).map((phase) => (
+            {DISCIPLINE_TABS.map((tab) => (
               <button
-                key={phase}
-                onClick={() => setPhaseOverride(phase)}
+                key={tab}
+                onClick={() => setDisciplineTab(tab)}
                 className={`px-3 py-1 rounded text-sm ${
-                  currentPhase === phase ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
+                  disciplineTab === tab ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
                 }`}
               >
-                {phase}
+                {tab}
               </button>
             ))}
           </div>
-        )}
-
-        {/* Discipline tabs */}
-        <div className="flex gap-2">
-          {DISCIPLINE_TABS.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setDisciplineTab(tab)}
-              className={`px-3 py-1 rounded text-sm ${
-                disciplineTab === tab ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
         </div>
-      </div>
+      )}
 
-      {groupStats.length === 0 && !loading ? (
+      {finalStandings ? (
+        <ol className="max-w-xl w-full mx-auto space-y-1">
+          {finalStandings.teams.map((team) => (
+            <li key={team.id} className="bg-white rounded-lg shadow px-3 py-2 flex items-center gap-3">
+              <span className="text-xl sm:text-2xl font-bold text-gray-500 w-8 text-center flex-shrink-0">
+                {team.final_place}
+              </span>
+              <span className="font-semibold text-base sm:text-lg truncate">{team.name}</span>
+            </li>
+          ))}
+        </ol>
+      ) : groupStats.length === 0 && !loading ? (
         <div className="flex-1 flex items-center justify-center">
           <p>Keine Teams oder Spiele gefunden.</p>
         </div>
@@ -157,10 +196,18 @@ const ScoresPage = () => {
 
                           {/* Stats row - horizontal on mobile, stays in line on desktop */}
                           <div className="flex justify-between sm:justify-end gap-2 sm:gap-4">
+                            {/* Placement score: what the Gesamt order is decided by */}
+                            {disciplineTab === 'Gesamt' && (
+                              <div className="text-center min-w-0 flex-1 sm:flex-initial sm:w-24">
+                                <div className="text-xs sm:text-sm font-semibold text-gray-700">Wertung</div>
+                                <div className="text-sm sm:text-lg font-bold">{team.finalScore}</div>
+                              </div>
+                            )}
+
                             {/* Sitting Stats */}
-                            <div className="text-center min-w-0 flex-1 sm:flex-initial sm:min-w-20">
+                            <div className="text-center min-w-0 flex-1 sm:flex-initial sm:w-24">
                               <div className="text-xs sm:text-sm font-semibold text-gray-700">Sitzen</div>
-                              <div className="text-sm sm:text-lg font-bold">{team.gamePointsSitting} Punkte</div>
+                              <div className="text-sm sm:text-lg font-bold">{pointsLabel(team.gamePointsSitting)}</div>
                               <div className="text-xs sm:text-sm font-medium text-gray-600">
                                 {sittingPointDiff > 0 ? '+' : ''}
                                 {sittingPointDiff}
@@ -168,9 +215,9 @@ const ScoresPage = () => {
                             </div>
 
                             {/* Standing Stats */}
-                            <div className="text-center min-w-0 flex-1 sm:flex-initial sm:min-w-20">
+                            <div className="text-center min-w-0 flex-1 sm:flex-initial sm:w-24">
                               <div className="text-xs sm:text-sm font-semibold text-gray-700">Stehen</div>
-                              <div className="text-sm sm:text-lg font-bold">{team.gamePointsStanding} Punkte</div>
+                              <div className="text-sm sm:text-lg font-bold">{pointsLabel(team.gamePointsStanding)}</div>
                               <div className="text-xs sm:text-sm font-medium text-gray-600">
                                 {standingPointDiff > 0 ? '+' : ''}
                                 {standingPointDiff}
