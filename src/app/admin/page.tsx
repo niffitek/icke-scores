@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
+import { errorMessage } from '@/lib/api'
 import { createCup, deleteCup, getCups } from '@/services/cups'
 import type { Cup } from '@/types/tournament'
 
@@ -42,8 +43,8 @@ const AdminPage = () => {
       setShowCreate(false)
       setNewCup({ title: '', address: '' })
       getCups().then(setCups)
-    } catch {
-      setError('Fehler beim Anlegen des Cups')
+    } catch (err) {
+      setError(errorMessage(err, 'Fehler beim Anlegen des Cups'))
     } finally {
       setSaving(false)
     }
@@ -56,8 +57,8 @@ const AdminPage = () => {
     try {
       await deleteCup(cupId)
       getCups().then(setCups)
-    } catch {
-      setError('Fehler beim Löschen des Cups')
+    } catch (err) {
+      setError(errorMessage(err, 'Fehler beim Löschen des Cups'))
     } finally {
       setSaving(false)
     }

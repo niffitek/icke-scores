@@ -1,8 +1,20 @@
-import axios, { type AxiosError } from 'axios'
+import axios, { type AxiosError, isAxiosError } from 'axios'
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? '/api',
 })
+
+// The API answers failures with { error }; show that cause instead of a bare
+// "Fehler beim …" so the admin can tell a duplicate from a broken database
+export const errorMessage = (error: unknown, context: string): string => {
+  // data is undefined for empty bodies, whatever axios' types claim
+  const detail = isAxiosError<{ error?: string } | undefined>(error)
+    ? (error.response?.data?.error ?? error.message)
+    : error instanceof Error
+      ? error.message
+      : ''
+  return detail ? `${context}: ${detail}` : context
+}
 
 // A 401 from the login attempt itself must not reload the page, or the
 // "wrong password" error would be wiped before the user can read it

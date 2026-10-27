@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { FINALRUNDE_GROUPS, TEAMS_PER_CUP, VORRUNDE_GROUPS } from '@/configs/constants'
+import { errorMessage } from '@/lib/api'
 import { getGroupsByCupId } from '@/services/groups'
 import { createGroupTeam, deleteGroupTeam, getGroupTeams } from '@/services/groupTeams'
 import { createTeam, deleteTeam, getTeams, updateTeam } from '@/services/teams'
@@ -90,8 +91,8 @@ const TeamsTabContent = ({ cupId, cup, locked, onTeamsChange }: TeamsTabContentP
       setShowEditDialog(false)
       setEditTeam(null)
       refreshTeams()
-    } catch {
-      setTeamEditError('Fehler beim Speichern des Teams')
+    } catch (err) {
+      setTeamEditError(errorMessage(err, 'Fehler beim Speichern des Teams'))
     } finally {
       setTeamEditLoading(false)
     }
@@ -103,8 +104,8 @@ const TeamsTabContent = ({ cupId, cup, locked, onTeamsChange }: TeamsTabContentP
     try {
       await deleteTeam(teamId)
       refreshTeams()
-    } catch {
-      alert('Fehler beim Löschen des Teams')
+    } catch (err) {
+      alert(errorMessage(err, 'Fehler beim Löschen des Teams'))
     } finally {
       setTeamDeleteLoading('')
     }
@@ -126,8 +127,8 @@ const TeamsTabContent = ({ cupId, cup, locked, onTeamsChange }: TeamsTabContentP
       setShowCreateDialog(false)
       setNewTeam({ name: '', contact: '' })
       refreshTeams()
-    } catch {
-      setCreateError('Fehler beim Anlegen des Teams')
+    } catch (err) {
+      setCreateError(errorMessage(err, 'Fehler beim Anlegen des Teams'))
     } finally {
       setCreateLoading(false)
     }

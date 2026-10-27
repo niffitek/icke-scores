@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FINALRUNDE_GROUPS, STATE_OPTIONS, TEAMS_PER_CUP, VORRUNDE_GROUPS } from '@/configs/constants'
 import { FINALRUNDE_SCHEDULE, VORRUNDE_SCHEDULE } from '@/configs/schedules'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
+import { errorMessage } from '@/lib/api'
 import { toLocalDateTimeString } from '@/lib/game-helpers'
 import { getCup, updateCup } from '@/services/cups'
 import { createGames, getGamesByCupId } from '@/services/games'
@@ -112,8 +113,8 @@ const CupDetails = () => {
       setSuccess('Erfolgreich gespeichert!')
       setEditing(false)
       refreshCup()
-    } catch {
-      setError('Fehler beim Speichern')
+    } catch (err) {
+      setError(errorMessage(err, 'Fehler beim Speichern'))
     } finally {
       setSaving(false)
     }
@@ -159,8 +160,8 @@ const CupDetails = () => {
       setGameSuccess('Spiele erfolgreich erstellt und Status aktualisiert!')
       setShowStartTimeDialog(false)
       refreshCup()
-    } catch {
-      setGameError('Fehler beim Erstellen der Spiele oder Aktualisieren des Status.')
+    } catch (err) {
+      setGameError(errorMessage(err, 'Fehler beim Erstellen der Spiele oder Aktualisieren des Status'))
     } finally {
       setSavingGames(false)
     }
@@ -209,8 +210,7 @@ const CupDetails = () => {
       setShowFinalrundeDialog(false)
       refreshCup()
     } catch (err) {
-      setGameError('Fehler beim Erstellen der Finalrunde.')
-      console.error(err)
+      setGameError(errorMessage(err, 'Fehler beim Erstellen der Finalrunde'))
     } finally {
       setSavingGames(false)
     }
@@ -243,8 +243,7 @@ const CupDetails = () => {
       refreshTeams() // Auswertung tab needs the freshly written final_place values
       setShowCloseTournamentDialog(false)
     } catch (err) {
-      setGameError('Fehler bei der Auswertung der Finalrunde.')
-      console.error(err)
+      setGameError(errorMessage(err, 'Fehler bei der Auswertung der Finalrunde'))
     } finally {
       setSavingGames(false)
     }
@@ -381,10 +380,11 @@ const CupDetails = () => {
                   <Button variant="outline" onClick={() => setShowCloseTournamentDialog(false)}>
                     Abbrechen
                   </Button>
-                  <Button variant="destructive" onClick={handleEvaluateFinalrunde}>
+                  <Button variant="destructive" onClick={handleEvaluateFinalrunde} disabled={savingGames}>
                     Zur Auswertung
                   </Button>
                 </DialogFooter>
+                {gameError && <p className="text-red-500 text-sm mt-2">{gameError}</p>}
               </DialogContent>
             </Dialog>
           )}

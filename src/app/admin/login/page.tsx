@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { isAxiosError } from 'axios'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import api from '@/lib/api'
+import api, { errorMessage } from '@/lib/api'
 
 const AdminLogin = () => {
   const [password, setPassword] = useState('')
@@ -22,8 +24,12 @@ const AdminLogin = () => {
       } else {
         setError('Unbekannter Fehler beim Login.')
       }
-    } catch {
-      setError("Falsches Passwort! Probier's nochmal!")
+    } catch (err) {
+      setError(
+        isAxiosError(err) && err.response?.status === 401
+          ? "Falsches Passwort! Probier's nochmal!"
+          : errorMessage(err, 'Login fehlgeschlagen')
+      )
     }
   }
 

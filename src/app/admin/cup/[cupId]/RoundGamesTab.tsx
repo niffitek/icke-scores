@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { errorMessage } from '@/lib/api'
 import { compareByStartTimeAndCourt, scoreOf } from '@/lib/game-helpers'
 import { getGames } from '@/services/games'
 import { getRoundsByGameId, updateRound } from '@/services/rounds'
@@ -58,6 +59,7 @@ const RoundGamesTab = ({ cupId, round, cupState }: { cupId: string; round: Round
   const [editGame, setEditGame] = useState<EditableGame | null>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   const loadGames = useCallback(async () => {
     const [allGames, allTeams] = await Promise.all([getGames(), getTeams()])
@@ -86,12 +88,14 @@ const RoundGamesTab = ({ cupId, round, cupState }: { cupId: string; round: Round
       round2_points_team_1: scoreOf(game.round2_points_team_1),
       round2_points_team_2: scoreOf(game.round2_points_team_2),
     })
+    setSaveError('')
     setShowEditDialog(true)
   }
 
   const handleSaveGame = async () => {
     if (!editGame) return
     setSaving(true)
+    setSaveError('')
     try {
       const rounds = await getRoundsByGameId(editGame.id)
       const round1 = rounds.at(0)
@@ -113,8 +117,8 @@ const RoundGamesTab = ({ cupId, round, cupState }: { cupId: string; round: Round
       setShowEditDialog(false)
       setEditGame(null)
       await loadGames()
-    } catch (error) {
-      console.error('Error saving game:', error)
+    } catch (err) {
+      setSaveError(errorMessage(err, 'Fehler beim Speichern des Spiels'))
     } finally {
       setSaving(false)
     }
@@ -198,6 +202,7 @@ const RoundGamesTab = ({ cupId, round, cupState }: { cupId: string; round: Round
               {saving ? 'Speichern...' : 'Speichern'}
             </Button>
           </DialogFooter>
+          {saveError && <p className="text-red-500 text-sm">{saveError}</p>}
         </DialogContent>
       </Dialog>
 
