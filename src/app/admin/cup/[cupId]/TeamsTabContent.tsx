@@ -64,10 +64,11 @@ const TeamsTabContent = ({ cupId, cup, locked, onTeamsChange }: TeamsTabContentP
   }
 
   const assignTeamToGroup = async (teamId: string, groupName: string) => {
-    const group = groups.find((g) => g.name === groupName)
-    if (group) {
-      await createGroupTeam({ group_id: group.id, team_id: teamId })
-    }
+    // Fresh fetch: right after mount the groups state can still be empty, and a
+    // silently skipped assignment left the team without a group
+    const group = (await getGroupsByCupId(cupId)).find((g) => g.name === groupName)
+    if (!group) throw new Error(`Gruppe ${groupName} nicht gefunden`)
+    await createGroupTeam({ group_id: group.id, team_id: teamId })
   }
 
   const handleSaveTeam = async () => {
