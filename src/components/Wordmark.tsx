@@ -1,6 +1,6 @@
 import { Bricolage_Grotesque } from 'next/font/google'
 
-const display = Bricolage_Grotesque({ subsets: ['latin'], weight: '800' })
+export const display = Bricolage_Grotesque({ subsets: ['latin'], weight: '800' })
 
 const SEAMS =
   'M32 32 C 44 28, 44 10, 30 4.2 M32 32 C 29.5 44.4, 45.1 53.4, 57.1 44.2 M32 32 C 22.5 23.6, 6.9 32.6, 8.9 47.6'

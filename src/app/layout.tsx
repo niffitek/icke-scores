@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import Link from 'next/link'
 
+import { NiffiCredit } from '@/components/NiffiCredit'
 import { Wordmark } from '@/components/Wordmark'
 
 import './globals.css'
@@ -54,14 +55,7 @@ export default function RootLayout({
         <main className="flex-1 container mx-auto px-4 py-3 min-h-0">{children}</main>
         <footer className="bg-white shadow py-2 px-5 text-center text-xs flex items-center justify-between">
           <div>&copy; {new Date().getFullYear()} IckeSports-Sportmarketing. All rights reserved.</div>
-          <a
-            href="https://niffi.dev"
-            target="_blank"
-            rel="noopener"
-            className="underline underline-offset-2 decoration-[#149567] hover:text-[#da333c]"
-          >
-            Made with ✨ by Niffi
-          </a>
+          <NiffiCredit />
         </footer>
       </body>
     </html>
