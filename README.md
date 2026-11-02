@@ -19,12 +19,12 @@ src/
 ├── configs/      # constants + tournament schedules
 ├── hooks/        # useAdminAuth (redirects to /admin/login without token)
 ├── lib/          # axios instance (auth via request interceptor), game helpers, cn
-├── services/     # typed API access (PHP backend, ?path=<resource>) + ranking logic
+├── services/     # typed API access (Next.js route handlers under /api) + ranking logic
 └── types/        # shared tournament types
 __tests__/        # jest unit tests
 ```
 
-The backend is a small PHP API (`?path=cups|teams|games|groups|group_teams|rounds`), configured via `NEXT_PUBLIC_API_URL`. Admin requests carry a Bearer token from `localStorage` (set on `/admin/login`), attached by the axios request interceptor.
+The backend is a set of Next.js route handlers (`src/app/api/**`, Neon Postgres, schema in `db/schema.sql`), reached via `NEXT_PUBLIC_API_URL`. Reads are public; mutations need the admin token (`ADMIN_TOKEN`), which `/admin/login` hands out for the right `ADMIN_PASSWORD` and the axios request interceptor attaches from `localStorage`. Public reads of `/api/teams` omit the `contact` column.
 
 ## Development
 

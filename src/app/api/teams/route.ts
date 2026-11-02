@@ -1,8 +1,15 @@
 import { TEAMS_PER_CUP } from '@/configs/constants'
 
-import { adminRoute, json, publicRoute, sql } from '../lib'
+import { adminRoute, isAdmin, json, publicRoute, sql } from '../lib'
 
-export const GET = publicRoute(async () => json(await sql()`SELECT * FROM teams`))
+// contact is personal data: only the admin area gets it, the public score pages don't
+export const GET = publicRoute(async (req) =>
+  json(
+    isAdmin(req)
+      ? await sql()`SELECT * FROM teams`
+      : await sql()`SELECT id, name, place, final_place, icke_cup_id FROM teams`
+  )
+)
 
 export const POST = adminRoute(async (req) => {
   const data = await req.json()

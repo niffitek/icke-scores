@@ -13,7 +13,8 @@ export type Cup = {
 export type Team = {
   id: string
   name: string
-  contact: string
+  // only present for admin requests; public reads strip it
+  contact?: string
   icke_cup_id: string
   place?: number | string | null
   final_place?: number | string | null

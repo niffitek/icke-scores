@@ -1,3 +1,5 @@
+import { NextRequest } from 'next/server'
+
 import * as cupById from '@/app/api/cups/[id]/route'
 import * as cups from '@/app/api/cups/route'
 import * as games from '@/app/api/games/route'
@@ -33,10 +35,32 @@ describe('auth', () => {
     }
   })
 
+  it('fails closed when no admin token is configured', async () => {
+    const saved = process.env.ADMIN_TOKEN
+    delete process.env.ADMIN_TOKEN
+    try {
+      const res = await call(cups.POST, { method: 'POST', body: {}, auth: false })
+      expect(res.status).toBe(401)
+      const forged = new NextRequest('http://test/api', {
+        method: 'POST',
+        body: '{}',
+        headers: { authorization: 'Bearer undefined' },
+      })
+      expect((await cups.POST(forged, { params: Promise.resolve({}) })).status).toBe(401)
+    } finally {
+      process.env.ADMIN_TOKEN = saved
+    }
+  })
+
   it('reads are public', async () => {
     for (const handler of [cups.GET, teams.GET, games.GET, groups.GET, groupTeams.GET, rounds.GET]) {
       expect((await call(handler, { auth: false })).status).toBe(200)
     }
+  })
+
+  it('hides team contacts from public reads', async () => {
+    const teams_ = await expectOk(call(teams.GET, { auth: false }))
+    for (const team of teams_) expect(team).not.toHaveProperty('contact')
   })
 
   it('login returns the token only for the right password', async () => {
