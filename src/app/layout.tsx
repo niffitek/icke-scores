@@ -1,12 +1,23 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import Link from 'next/link'
+
+import { Wordmark } from '@/components/Wordmark'
 
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Icke-Cup',
-  description: 'Created by IckeSports-Sportmarketing',
+  title: { default: 'Icke-Cup', template: '%s · Icke-Cup' },
+  description:
+    'Spielplan, Live-Ergebnisse und Rangliste des Icke-Cup Volleyballturniers von IckeSports-Sportmarketing.',
+  openGraph: {
+    title: 'Icke-Cup',
+    description: 'Spielplan, Live-Ergebnisse und Rangliste des Icke-Cup.',
+    type: 'website',
+    locale: 'de_DE',
+  },
 }
+
+export const viewport: Viewport = { themeColor: '#da333c' }
 
 export default function RootLayout({
   children,
@@ -14,14 +25,13 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="de">
       <body className="min-h-screen bg-gray-100 flex flex-col">
         <header className="bg-white shadow sticky top-0 z-50">
           <nav className="container mx-auto px-4 py-4 flex justify-between items-center">
-            <div className="text-lg sm:text-xl font-bold">
-              <span className="text-[#da333c]">Icke</span>
-              <span className="text-[#149567]">Cup</span>
-            </div>
+            <Link href="/" aria-label="Icke-Cup, zur Startseite">
+              <Wordmark className="text-2xl sm:text-3xl" />
+            </Link>
             <ul className="flex space-x-2 sm:space-x-4">
               <li>
                 <Link href="/" className="hover:text-[#da333c] text-sm sm:text-base whitespace-nowrap">
@@ -44,7 +54,9 @@ export default function RootLayout({
         <main className="flex-1 container mx-auto px-4 py-3 min-h-0">{children}</main>
         <footer className="bg-white shadow py-2 px-5 text-center text-xs flex items-center justify-between">
           <div>&copy; {new Date().getFullYear()} IckeSports-Sportmarketing. All rights reserved.</div>
-          <div>Made with ✨ by Niffi</div>
+          <a href="https://niffi.dev" className="hover:text-[#da333c]">
+            Made with ✨ by Niffi
+          </a>
         </footer>
       </body>
     </html>
