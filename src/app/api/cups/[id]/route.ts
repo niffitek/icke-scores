@@ -9,7 +9,7 @@ export const PUT = adminRoute(async (req, { id }) => {
     return json({ error: 'Missing required fields' }, 400)
   }
   const db = sql()
-  // Only one cup may run at a time; getActiveCup relies on it
+  // Only one cup may run at a time; getDisplayCup relies on it
   if (ACTIVE_STATES.includes(data.state)) {
     const active = await db`SELECT id FROM icke_cups WHERE state = ANY(${ACTIVE_STATES}) AND id <> ${id}`
     if (active.length > 0) return json({ error: 'Another cup is already active' }, 409)

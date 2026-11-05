@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { FINALRUNDE_GROUPS, VORRUNDE_GROUPS } from '@/configs/constants'
 import { hasScores } from '@/lib/game-helpers'
-import { getActiveCup, getCups } from '@/services/cups'
+import { getDisplayCup } from '@/services/cups'
 import { getGamesByCupId } from '@/services/games'
 import { getGroupsByCupId } from '@/services/groups'
 import { getGroupTeams } from '@/services/groupTeams'
@@ -36,33 +36,22 @@ const ScoresPage = () => {
   // null = follow the cup's current phase; set once the user toggles
   const [phaseOverride, setPhaseOverride] = useState<RoundName | null>(null)
   const [disciplineTab, setDisciplineTab] = useState<DisciplineTab>('Gesamt')
-  // Shown between cups: the final places of the last finished one
+  // Final places of a finished cup, shown above its group rankings
   const [finalStandings, setFinalStandings] = useState<FinalStandings | null>(null)
 
   const fetchScores = useCallback(async () => {
     try {
-      const activeCup = await getActiveCup()
+      const activeCup = await getDisplayCup()
       if (!activeCup) {
         setGroupStats([])
         setCupState('')
-        const lastFinished = (await getCups())
-          .filter((cup) => cup.state === 'Abgeschlossen')
-          .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
-          .at(0)
-        const placedTeams = lastFinished
-          ? (await getTeamsByCupId(lastFinished.id))
-              .filter((team) => team.final_place != null && team.final_place !== '')
-              .sort((a, b) => Number(a.final_place) - Number(b.final_place))
-          : []
-        setFinalStandings(
-          lastFinished && placedTeams.length > 0 ? { title: lastFinished.title, teams: placedTeams } : null
-        )
+        setFinalStandings(null)
         return
       }
-      setFinalStandings(null)
       setCupState(activeCup.state)
 
-      const phase: RoundName = phaseOverride ?? (activeCup.state === 'Finalrunde' ? 'Finalrunde' : 'Vorrunde')
+      const finished = activeCup.state === 'Abgeschlossen'
+      const phase: RoundName = phaseOverride ?? (activeCup.state === 'Vorrunde' ? 'Vorrunde' : 'Finalrunde')
       const relevantGroups = phase === 'Finalrunde' ? FINALRUNDE_GROUPS : VORRUNDE_GROUPS
 
       const [groups, teams, groupTeams, games] = await Promise.all([
@@ -71,6 +60,13 @@ const ScoresPage = () => {
         getGroupTeams(),
         getGamesByCupId(activeCup.id),
       ])
+
+      const placedTeams = finished
+        ? teams
+            .filter((team) => team.final_place != null && team.final_place !== '')
+            .sort((a, b) => Number(a.final_place) - Number(b.final_place))
+        : []
+      setFinalStandings(placedTeams.length > 0 ? { title: activeCup.title, teams: placedTeams } : null)
 
       const filteredGroups = groups.filter((group) => relevantGroups.includes(group.name))
       const finishedGames = games.filter((game) => game.round === phase && hasScores(game))
@@ -101,7 +97,8 @@ const ScoresPage = () => {
     return () => clearInterval(interval)
   }, [fetchScores])
 
-  const currentPhase: RoundName = phaseOverride ?? (cupState === 'Finalrunde' ? 'Finalrunde' : 'Vorrunde')
+  const currentPhase: RoundName = phaseOverride ?? (cupState === 'Vorrunde' ? 'Vorrunde' : 'Finalrunde')
+  const hasFinalrunde = cupState === 'Finalrunde' || cupState === 'Abgeschlossen'
 
   const teamsForTab = (teams: TeamStats[]): TeamStats[] =>
     disciplineTab === 'Gesamt'
@@ -118,44 +115,8 @@ const ScoresPage = () => {
         </h1>
       </div>
 
-      {!finalStandings && (
-        <div className="flex items-center justify-center gap-4 mb-2 flex-shrink-0">
-          {/* Phase toggle, only once the Finalrunde exists */}
-          {cupState === 'Finalrunde' && (
-            <div className="flex gap-2">
-              {(['Vorrunde', 'Finalrunde'] as const).map((phase) => (
-                <button
-                  key={phase}
-                  onClick={() => setPhaseOverride(phase)}
-                  className={`px-3 py-1 rounded text-sm ${
-                    currentPhase === phase ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
-                  }`}
-                >
-                  {phase}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Discipline tabs */}
-          <div className="flex gap-2">
-            {DISCIPLINE_TABS.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setDisciplineTab(tab)}
-                className={`px-3 py-1 rounded text-sm ${
-                  disciplineTab === tab ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {finalStandings ? (
-        <ol className="max-w-xl w-full mx-auto space-y-1">
+      {finalStandings && (
+        <ol className="max-w-xl w-full mx-auto space-y-1 mb-4 flex-shrink-0">
           {finalStandings.teams.map((team) => (
             <li key={team.id} className="bg-white rounded-lg shadow px-3 py-2 flex items-center gap-3">
               <span className="text-xl sm:text-2xl font-bold text-gray-500 w-8 text-center flex-shrink-0">
@@ -165,7 +126,47 @@ const ScoresPage = () => {
             </li>
           ))}
         </ol>
-      ) : groupStats.length === 0 && !loading ? (
+      )}
+
+      {finalStandings && (
+        <h2 className="text-lg font-semibold text-center mb-2 flex-shrink-0">Gruppen - {currentPhase}</h2>
+      )}
+
+      <div className="flex items-center justify-center gap-4 mb-2 flex-shrink-0">
+        {/* Phase toggle, only once the Finalrunde exists */}
+        {hasFinalrunde && (
+          <div className="flex gap-2">
+            {(['Vorrunde', 'Finalrunde'] as const).map((phase) => (
+              <button
+                key={phase}
+                onClick={() => setPhaseOverride(phase)}
+                className={`px-3 py-1 rounded text-sm ${
+                  currentPhase === phase ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                {phase}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Discipline tabs */}
+        <div className="flex gap-2">
+          {DISCIPLINE_TABS.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setDisciplineTab(tab)}
+              className={`px-3 py-1 rounded text-sm ${
+                disciplineTab === tab ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {groupStats.length === 0 && !loading ? (
         <div className="flex-1 flex items-center justify-center">
           <p>Keine Teams oder Spiele gefunden.</p>
         </div>

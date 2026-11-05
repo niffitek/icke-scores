@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 
 import {
   compareByStartTimeAndCourt,
@@ -10,7 +11,7 @@ import {
   GAME_STATUS_LABELS,
   isSittingGame,
 } from '@/lib/game-helpers'
-import { getActiveCup } from '@/services/cups'
+import { getDisplayCup } from '@/services/cups'
 import { getGamesByCupId } from '@/services/games'
 import { getTeamsByCupId } from '@/services/teams'
 import type { Game, RoundName } from '@/types/tournament'
@@ -65,11 +66,13 @@ const Home = () => {
   const [games, setGames] = useState<EnrichedGame[]>([])
   const [loading, setLoading] = useState(true)
   const [currentRound, setCurrentRound] = useState<RoundName>()
+  const [finished, setFinished] = useState(false)
 
   const fetchGames = useCallback(async () => {
     try {
-      const activeCup = await getActiveCup()
-      if (!activeCup) {
+      const activeCup = await getDisplayCup()
+      setFinished(activeCup?.state === 'Abgeschlossen')
+      if (!activeCup || (activeCup.state !== 'Vorrunde' && activeCup.state !== 'Finalrunde')) {
         setGames([])
         return
       }
@@ -103,11 +106,23 @@ const Home = () => {
     <section>
       <div className="flex items-center gap-2 mb-4">
         <h1 className="text-xl font-semibold">
-          {currentRound ? `Nächste Runde - ${currentRound}` : "Bald geht's los!"}
+          {currentRound ? `Nächste Runde - ${currentRound}` : finished ? 'Turnier beendet' : "Bald geht's los!"}
         </h1>
       </div>
       {games.length === 0 && !loading ? (
-        <p>Rutscht euch schon mal warm!</p>
+        <p>
+          {finished ? (
+            <>
+              Danke fürs Mitspielen! Die Endplatzierungen stehen unter{' '}
+              <Link href="/scores" className="underline">
+                Rangliste
+              </Link>
+              .
+            </>
+          ) : (
+            'Rutscht euch schon mal warm!'
+          )}
+        </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <GameColumn title="Sitzen" games={sittingGames} />

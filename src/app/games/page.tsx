@@ -10,7 +10,7 @@ import {
   GAME_STATUS_LABELS,
   hasScores,
 } from '@/lib/game-helpers'
-import { getActiveCup } from '@/services/cups'
+import { getDisplayCup } from '@/services/cups'
 import { getGamesByCupId } from '@/services/games'
 import { getTeamsByCupId } from '@/services/teams'
 import type { GameStatus, Team } from '@/types/tournament'
@@ -36,7 +36,7 @@ const GamesPage = () => {
 
   const fetchGames = useCallback(async () => {
     try {
-      const activeCup = await getActiveCup()
+      const activeCup = await getDisplayCup()
       if (!activeCup) {
         setGames([])
         return

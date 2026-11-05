@@ -11,9 +11,14 @@ export const getCup = async (id: string): Promise<Cup | undefined> => {
   return cups.find((cup) => cup.id === id)
 }
 
-export const getActiveCup = async (): Promise<Cup | undefined> => {
+// What the public pages show: the running cup, otherwise the newest one, so a
+// finished cup's games and results stay visible until the next cup is created.
+export const getDisplayCup = async (): Promise<Cup | undefined> => {
   const cups = await getCups()
-  return cups.find((cup) => cup.state === 'Vorrunde' || cup.state === 'Finalrunde')
+  return (
+    cups.find((cup) => cup.state === 'Vorrunde' || cup.state === 'Finalrunde') ??
+    [...cups].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).at(0)
+  )
 }
 
 export const createCup = async (cup: Cup): Promise<void> => {

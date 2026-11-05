@@ -371,8 +371,8 @@ const CupDetails = () => {
                   <DialogTitle>Turnier abschließen</DialogTitle>
                 </DialogHeader>
                 <div className="py-4">
-                  Sind Sie sicher, dass Sie zur Auswertung fortfahren möchten? Diese Aktion kann nicht rückgängig
-                  gemacht werden.
+                  Die Endplatzierungen werden berechnet und sofort auf der Website veröffentlicht. Erst nach der
+                  Siegerehrung bestätigen. Diese Aktion kann nicht rückgängig gemacht werden.
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setShowCloseTournamentDialog(false)}>
