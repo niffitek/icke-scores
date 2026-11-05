@@ -11,8 +11,8 @@ const groups: Group[] = [
   { id: 'gE', name: 'E', icke_cup_id: CUP },
 ]
 const groupTeams: GroupTeam[] = ['gA', 'gE'].flatMap((g) => teams.map((t) => ({ group_id: g, team_id: t.id })))
-const game = (round: Game['round'], p1: number, p2: number): Game => ({
-  id: `${round}-game`,
+const game = (round: Game['round'], p1: number, p2: number, p1b = p1, p2b = p2): Game => ({
+  id: `${round}-game-${p1}-${p2}-${p1b}-${p2b}`,
   icke_cup_id: CUP,
   team_1_id: 'A1',
   team_2_id: 'A2',
@@ -22,10 +22,10 @@ const game = (round: Game['round'], p1: number, p2: number): Game => ({
   start_at: '2026-07-04T09:00:00',
   round1_points_team_1: p1,
   round1_points_team_2: p2,
-  round2_points_team_1: p1,
-  round2_points_team_2: p2,
+  round2_points_team_1: p1b,
+  round2_points_team_2: p2b,
   round1_winner: p1 > p2 ? 'A1' : 'A2',
-  round2_winner: p1 > p2 ? 'A1' : 'A2',
+  round2_winner: p1b > p2b ? 'A1' : 'A2',
 })
 
 describe('buildCupSheets', () => {
@@ -60,5 +60,20 @@ describe('buildCupSheets', () => {
       'Satz 2 Team 2': 15,
       Sieger: 'Alpha',
     })
+  })
+
+  it('decides a set split by total points, equal totals are a draw', () => {
+    const split = buildCupSheets(
+      teams,
+      [game('Vorrunde', 12, 8, 8, 14), game('Vorrunde', 10, 8, 8, 10)],
+      groups,
+      groupTeams
+    )
+    expect(split.Spiele.map((row) => row.Sieger)).toEqual(['Beta', ''])
+  })
+
+  it('has no ranking for a phase without any played game', () => {
+    const unplayed = buildCupSheets(teams, [game('Vorrunde', 21, 15), game('Finalrunde', 0, 0)], groups, groupTeams)
+    expect(unplayed.Finalrunde).toEqual([])
   })
 })

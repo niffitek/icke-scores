@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx'
 
 import { FINALRUNDE_GROUPS, VORRUNDE_GROUPS } from '@/configs/constants'
-import { compareByStartTimeAndCourt, isSittingGame, scoreOf } from '@/lib/game-helpers'
+import { compareByStartTimeAndCourt, hasScores, isSittingGame, scoreOf } from '@/lib/game-helpers'
 import { rankPhaseGroups } from '@/services/tournament'
 import type { Cup, Game, Group, GroupTeam, RoundName, Team } from '@/types/tournament'
 
@@ -17,6 +17,8 @@ const rankingRows = (
 ): Row[] => {
   const phase = round === 'Vorrunde' ? VORRUNDE_GROUPS : FINALRUNDE_GROUPS
   const roundGames = games.filter((game) => game.round === round)
+  // Placement points are handed out even without results; an unplayed phase has no ranking yet
+  if (!roundGames.some(hasScores)) return []
   return rankPhaseGroups(teams, roundGames, groups, groupTeams, phase).flatMap((ranking, groupIndex) =>
     ranking.map((stats, index) => ({
       Gruppe: phase[groupIndex],
@@ -36,11 +38,13 @@ const rankingRows = (
 // Everything about a cup as rows per sheet: final places, both phase rankings, all games
 export const buildCupSheets = (teams: Team[], games: Game[], groups: Group[], groupTeams: GroupTeam[]): CupSheets => {
   const nameOf = (id: string | null | undefined): string => teams.find((team) => team.id === id)?.name ?? ''
+  // Same rule as the ranking: total points over both sets decide, equal = draw
   const winnerOf = (game: Game): string => {
-    const won1 = [game.round1_winner, game.round2_winner].filter((id) => id === game.team_1_id).length
-    const won2 = [game.round1_winner, game.round2_winner].filter((id) => id === game.team_2_id).length
-    if (won1 === won2) return ''
-    return nameOf(won1 > won2 ? game.team_1_id : game.team_2_id)
+    if (!hasScores(game)) return ''
+    const points1 = scoreOf(game.round1_points_team_1) + scoreOf(game.round2_points_team_1)
+    const points2 = scoreOf(game.round1_points_team_2) + scoreOf(game.round2_points_team_2)
+    if (points1 === points2) return ''
+    return nameOf(points1 > points2 ? game.team_1_id : game.team_2_id)
   }
 
   const placed = teams
