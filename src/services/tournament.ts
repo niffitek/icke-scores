@@ -72,7 +72,7 @@ export const buildScheduleGames = (
 // After the Finalrunde starts every team belongs to two groups (A-D and E-H).
 // Rankings must only ever see the groups of one phase, otherwise
 // awardPlacementScores hands out placement points twice per team.
-const rankPhaseGroups = (
+export const rankPhaseGroups = (
   teams: Team[],
   games: Game[],
   groups: Group[],

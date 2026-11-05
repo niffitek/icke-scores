@@ -462,7 +462,7 @@ const CupDetails = () => {
           <RoundGamesTab cupId={cupId} round="Finalrunde" cupState={cup.state} />
         </TabsContent>
         <TabsContent value="auswertung">
-          <AuswertungTabContent cupId={cupId} teams={teams} />
+          <AuswertungTabContent cup={cup} teams={teams} />
         </TabsContent>
       </Tabs>
     </div>
