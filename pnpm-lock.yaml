@@ -19,6 +19,9 @@ importers:
       '@neondatabase/serverless':
         specifier: ^1.1.0
         version: 1.1.0
+      '@niffi/brand':
+        specifier: github:niffitek/brand#v0.1.1
+        version: https://codeload.github.com/niffitek/brand/tar.gz/76b4d867f1a1ff650f3f87461a344bb96efa9c5f(react@19.2.7)
       '@radix-ui/react-dialog':
         specifier: ^1.1.14
         version: 1.1.18(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -1181,6 +1184,15 @@ packages:
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
+
+  '@niffi/brand@https://codeload.github.com/niffitek/brand/tar.gz/76b4d867f1a1ff650f3f87461a344bb96efa9c5f':
+    resolution: {tarball: https://codeload.github.com/niffitek/brand/tar.gz/76b4d867f1a1ff650f3f87461a344bb96efa9c5f}
+    version: 0.1.1
+    peerDependencies:
+      react: '>=19'
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -5322,6 +5334,10 @@ snapshots:
 
   '@next/swc-win32-x64-msvc@15.5.28':
     optional: true
+
+  '@niffi/brand@https://codeload.github.com/niffitek/brand/tar.gz/76b4d867f1a1ff650f3f87461a344bb96efa9c5f(react@19.2.7)':
+    optionalDependencies:
+      react: 19.2.7
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
