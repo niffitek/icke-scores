@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from 'next'
 import Link from 'next/link'
 
+import { IckeCupLogo } from '@niffi/brand/react'
+
 import { NiffiCredit } from '@/components/NiffiCredit'
-import { Wordmark } from '@/components/Wordmark'
 
 import './globals.css'
 
@@ -31,7 +32,7 @@ export default function RootLayout({
         <header className="bg-white shadow sticky top-0 z-50">
           <nav className="container mx-auto px-4 py-4 flex justify-between items-center">
             <Link href="/" aria-label="Icke-Cup, zur Startseite">
-              <Wordmark className="text-2xl sm:text-3xl" />
+              <IckeCupLogo className="text-2xl sm:text-3xl" />
             </Link>
             <ul className="flex space-x-2 sm:space-x-4">
               <li>

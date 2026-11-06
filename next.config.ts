@@ -8,6 +8,7 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  transpilePackages: ['@niffi/brand'],
   headers: async () => [{ source: '/:path*', headers: securityHeaders }],
 }
 
