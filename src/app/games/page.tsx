@@ -16,6 +16,7 @@ import { getTeamsByCupId } from '@/services/teams'
 import type { GameStatus, Team } from '@/types/tournament'
 
 const REFRESH_INTERVAL_MS = 30_000
+const TEAM_FILTER_KEY = 'teamFilter'
 
 type GameFilter = 'all' | GameStatus
 
@@ -33,6 +34,24 @@ const GamesPage = () => {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<GameFilter>('all')
   const [teamFilter, setTeamFilter] = useState('') // '' = alle Teams
+
+  // Remember the visitor's team across reloads; storage may be blocked (private mode)
+  useEffect(() => {
+    try {
+      setTeamFilter(localStorage.getItem(TEAM_FILTER_KEY) ?? '')
+    } catch {
+      // storage blocked: the filter just is not remembered
+    }
+  }, [])
+
+  const selectTeam = (teamId: string) => {
+    setTeamFilter(teamId)
+    try {
+      localStorage.setItem(TEAM_FILTER_KEY, teamId)
+    } catch {
+      // storage blocked: the filter just is not remembered
+    }
+  }
 
   const fetchGames = useCallback(async () => {
     try {
@@ -58,9 +77,11 @@ const GamesPage = () => {
     return () => clearInterval(interval)
   }, [fetchGames])
 
+  // A remembered team from an earlier cup is not in this cup's list: show all teams
+  const activeTeam = teams.some((team) => team.id === teamFilter) ? teamFilter : ''
   const filteredGames = games
     .filter((game) => filter === 'all' || game.status === filter)
-    .filter((game) => !teamFilter || game.team_1_id === teamFilter || game.team_2_id === teamFilter)
+    .filter((game) => !activeTeam || game.team_1_id === activeTeam || game.team_2_id === activeTeam)
 
   return (
     <section>
@@ -73,8 +94,8 @@ const GamesPage = () => {
         <div className="flex items-center gap-2">
           <select
             className="border rounded px-2 py-1 text-sm"
-            value={teamFilter}
-            onChange={(e) => setTeamFilter(e.target.value)}
+            value={activeTeam}
+            onChange={(e) => selectTeam(e.target.value)}
             aria-label="Nach Team filtern"
           >
             <option value="">Alle Teams</option>

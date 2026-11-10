@@ -10,6 +10,7 @@ import { getGroupsByCupId } from '@/services/groups'
 import { getGroupTeams } from '@/services/groupTeams'
 import { buildTeamStats, fillAllTeamStats, sortTeamStatsByDiscipline, sortTeamStatsByGroup } from '@/services/ranking'
 import { getTeamsByCupId } from '@/services/teams'
+import { finalGroupPlaces } from '@/services/tournament'
 import type { CupState, RoundName, Team, TeamStats } from '@/types/tournament'
 
 const REFRESH_INTERVAL_MS = 30_000
@@ -175,7 +176,14 @@ const ScoresPage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 h-full max-w-7xl mx-auto">
             {groupStats.map((group) => (
               <div key={group.name} className="bg-gray-50 rounded-lg p-3 flex flex-col min-h-0">
-                <h2 className="text-lg font-bold mb-1 text-gray-800 text-center flex-shrink-0">Gruppe {group.name}</h2>
+                <h2 className="text-lg font-bold mb-1 text-gray-800 text-center flex-shrink-0">
+                  Gruppe {group.name}
+                  {finalGroupPlaces(group.name) && (
+                    <span className="block text-sm font-normal text-gray-500">
+                      Spiel um {finalGroupPlaces(group.name)}
+                    </span>
+                  )}
+                </h2>
                 <div className="flex-1 overflow-auto space-y-1 min-h-0">
                   {teamsForTab(group.teams).map((team, index) => {
                     const sittingPointDiff = team.totalPointsSitting - team.totalPointsAgainstSitting

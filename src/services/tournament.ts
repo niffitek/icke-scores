@@ -112,6 +112,11 @@ export const seedFinalGroups = (
 }
 
 // Places 1-4 come from group E, 5-8 from F, 9-12 from G, 13-16 from H
+export const finalGroupPlaces = (groupName: string): string | null => {
+  const index = FINALRUNDE_GROUPS.indexOf(groupName)
+  return index < 0 ? null : `Platz ${index * 4 + 1}–${index * 4 + 4}`
+}
+
 export const computeFinalPlaces = (
   teams: Team[],
   finalrundeGames: Game[],
