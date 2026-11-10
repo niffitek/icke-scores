@@ -3,6 +3,7 @@ import { VORRUNDE_SCHEDULE } from '@/configs/schedules'
 import {
   buildScheduleGames,
   computeFinalPlaces,
+  finalGroupPlaces,
   groupTeamsByGroupName,
   hasDistinctPositions,
   seedFinalGroups,
@@ -234,5 +235,15 @@ describe('computeFinalPlaces', () => {
     expect(byTeam.B4).toBe(16)
 
     expect(places.map((p) => p.final_place).sort((a, b) => a - b)).toEqual(Array.from({ length: 16 }, (_, i) => i + 1))
+  })
+})
+
+describe('finalGroupPlaces', () => {
+  it('labels the place range each Finalrunde group plays for', () => {
+    expect(FINALRUNDE_GROUPS.map(finalGroupPlaces)).toEqual(['Platz 1–4', 'Platz 5–8', 'Platz 9–12', 'Platz 13–16'])
+  })
+
+  it('has no label for Vorrunde groups', () => {
+    expect(finalGroupPlaces('A')).toBeNull()
   })
 })
