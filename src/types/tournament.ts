@@ -73,6 +73,12 @@ export type TeamStats = {
   totalPointsStanding: number
   totalPointsAgainstSitting: number
   totalPointsAgainstStanding: number
+  // Group rank per discipline (1-4, 0 = not ranked) and the placement points it earned;
+  // finalScore ("Wertung") = placementScoreSitting + placementScoreStanding
+  placeSitting: number
+  placeStanding: number
+  placementScoreSitting: number
+  placementScoreStanding: number
   finalScore: number
 }
 

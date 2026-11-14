@@ -8,7 +8,14 @@ import { getDisplayCup } from '@/services/cups'
 import { getGamesByCupId } from '@/services/games'
 import { getGroupsByCupId } from '@/services/groups'
 import { getGroupTeams } from '@/services/groupTeams'
-import { buildTeamStats, fillAllTeamStats, sortTeamStatsByDiscipline, sortTeamStatsByGroup } from '@/services/ranking'
+import {
+  buildTeamStats,
+  fillAllTeamStats,
+  SITTING_PLACEMENT_SCORES,
+  sortTeamStatsByDiscipline,
+  sortTeamStatsByGroup,
+  STANDING_PLACEMENT_SCORES,
+} from '@/services/ranking'
 import { getTeamsByCupId } from '@/services/teams'
 import type { CupState, RoundName, Team, TeamStats } from '@/types/tournament'
 
@@ -28,6 +35,11 @@ type FinalStandings = {
 }
 
 const pointsLabel = (points: number): string => `${points} ${points === 1 ? 'Punkt' : 'Punkte'}`
+
+const signed = (value: number): string => `${value > 0 ? '+' : ''}${value}`
+
+// Group rank in one discipline, shown next to the point diff in the Gesamt tab
+const placeLabel = (place: number): string => (place > 0 ? ` · Platz ${place}` : '')
 
 const ScoresPage = () => {
   const [groupStats, setGroupStats] = useState<GroupStats[]>([])
@@ -132,7 +144,7 @@ const ScoresPage = () => {
         <h2 className="text-lg font-semibold text-center mb-2 flex-shrink-0">Gruppen - {currentPhase}</h2>
       )}
 
-      <div className="flex items-center justify-center gap-4 mb-2 flex-shrink-0">
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mb-2 flex-shrink-0">
         {/* Phase toggle, only once the Finalrunde exists */}
         {hasFinalrunde && (
           <div className="flex gap-2">
@@ -165,6 +177,14 @@ const ScoresPage = () => {
           ))}
         </div>
       </div>
+
+      {/* How the Gesamt order ("Wertung") comes about */}
+      {disciplineTab === 'Gesamt' && groupStats.length > 0 && (
+        <p className="text-xs sm:text-sm text-gray-600 text-center mb-2 flex-shrink-0">
+          Wertung = Platzpunkte Sitzen + Stehen. Gruppenplatz 1-4 gibt im Sitzen {SITTING_PLACEMENT_SCORES.join('/')}{' '}
+          und im Stehen {STANDING_PLACEMENT_SCORES.join('/')} Punkte.
+        </p>
+      )}
 
       {groupStats.length === 0 && !loading ? (
         <div className="flex-1 flex items-center justify-center">
@@ -202,6 +222,9 @@ const ScoresPage = () => {
                               <div className="text-center min-w-0 flex-1 sm:flex-initial sm:w-24">
                                 <div className="text-xs sm:text-sm font-semibold text-gray-700">Wertung</div>
                                 <div className="text-sm sm:text-lg font-bold">{team.finalScore}</div>
+                                <div className="text-xs sm:text-sm font-medium text-gray-600">
+                                  {team.placementScoreSitting} + {team.placementScoreStanding}
+                                </div>
                               </div>
                             )}
 
@@ -210,8 +233,8 @@ const ScoresPage = () => {
                               <div className="text-xs sm:text-sm font-semibold text-gray-700">Sitzen</div>
                               <div className="text-sm sm:text-lg font-bold">{pointsLabel(team.gamePointsSitting)}</div>
                               <div className="text-xs sm:text-sm font-medium text-gray-600">
-                                {sittingPointDiff > 0 ? '+' : ''}
-                                {sittingPointDiff}
+                                {signed(sittingPointDiff)}
+                                {disciplineTab === 'Gesamt' && placeLabel(team.placeSitting)}
                               </div>
                             </div>
 
@@ -220,8 +243,8 @@ const ScoresPage = () => {
                               <div className="text-xs sm:text-sm font-semibold text-gray-700">Stehen</div>
                               <div className="text-sm sm:text-lg font-bold">{pointsLabel(team.gamePointsStanding)}</div>
                               <div className="text-xs sm:text-sm font-medium text-gray-600">
-                                {standingPointDiff > 0 ? '+' : ''}
-                                {standingPointDiff}
+                                {signed(standingPointDiff)}
+                                {disciplineTab === 'Gesamt' && placeLabel(team.placeStanding)}
                               </div>
                             </div>
                           </div>

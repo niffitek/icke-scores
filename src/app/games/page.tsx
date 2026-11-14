@@ -64,15 +64,16 @@ const GamesPage = () => {
 
   return (
     <section>
-      <div className="flex justify-between items-center mb-4">
+      {/* Stacked on phones: title, then filters (they wrap instead of overflowing) */}
+      <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:justify-between sm:items-center">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-semibold">Alle Spiele</h1>
         </div>
 
         {/* Filter buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select
-            className="border rounded px-2 py-1 text-sm"
+            className="border rounded px-2 py-1 text-sm w-full sm:w-auto min-w-0"
             value={teamFilter}
             onChange={(e) => setTeamFilter(e.target.value)}
             aria-label="Nach Team filtern"
@@ -127,7 +128,7 @@ const GamesPage = () => {
 
               {/* Center: Team names */}
               <div className="text-center mb-3">
-                <p className="font-medium text-lg">
+                <p className="font-medium text-lg break-words">
                   {game.team1Name} vs {game.team2Name}
                 </p>
               </div>

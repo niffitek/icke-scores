@@ -256,3 +256,28 @@ describe('Los (lot) tiebreak', () => {
     expect(stats['t-b']!.finalScore).toBe(17) // 9 sitting + 8 standing
   })
 })
+
+describe('Wertung breakdown', () => {
+  it('records each discipline place and its placement points, summing to finalScore', () => {
+    const stats = buildTeamStats(teams, groupTeams)
+    // t1 beats t2 sitting, t2 beats t1 standing
+    const games = [
+      game({ sitting: '1', round1_points_team_1: '21', round1_points_team_2: '10' }),
+      game({ id: 'game-2', sitting: 0, round1_points_team_1: '10', round1_points_team_2: '21' }),
+    ]
+
+    fillAllTeamStats(stats, games, groups, groupTeams)
+
+    expect(stats.t1).toMatchObject({
+      placeSitting: 1,
+      placementScoreSitting: 11,
+      placeStanding: 4,
+      placementScoreStanding: 4,
+      finalScore: 15,
+    })
+    expect(stats.t2).toMatchObject({ placeSitting: 4, placeStanding: 1, placementScoreStanding: 10 })
+    for (const s of Object.values(stats)) {
+      expect(s!.finalScore).toBe(s!.placementScoreSitting + s!.placementScoreStanding)
+    }
+  })
+})

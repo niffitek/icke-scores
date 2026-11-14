@@ -29,9 +29,10 @@ export default function RootLayout({
     <html lang="de">
       <body className="min-h-screen bg-gray-100 flex flex-col">
         <header className="bg-white shadow sticky top-0 z-50">
-          <nav className="container mx-auto px-4 py-4 flex justify-between items-center">
-            <Link href="/" aria-label="Icke-Cup, zur Startseite">
-              <Wordmark className="text-2xl sm:text-3xl" />
+          <nav className="container mx-auto px-4 py-4 flex justify-between items-center gap-2">
+            <Link href="/" aria-label="Icke-Cup, zur Startseite" className="flex-shrink-0">
+              {/* Smaller below 360px so the nav fits on the narrowest phones */}
+              <Wordmark className="text-xl min-[360px]:text-2xl sm:text-3xl" />
             </Link>
             <ul className="flex space-x-2 sm:space-x-4">
               <li>

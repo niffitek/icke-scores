@@ -2,8 +2,8 @@ import { hasScores, isSittingGame, scoreOf } from '@/lib/game-helpers'
 import type { Game, Group, GroupTeam, Team, TeamStats, TeamStatsMap } from '@/types/tournament'
 
 // Placement points per group rank (1st..4th), awarded separately per discipline
-const SITTING_PLACEMENT_SCORES = [11, 9, 7, 5]
-const STANDING_PLACEMENT_SCORES = [10, 8, 6, 4]
+export const SITTING_PLACEMENT_SCORES = [11, 9, 7, 5]
+export const STANDING_PLACEMENT_SCORES = [10, 8, 6, 4]
 
 export const buildTeamStats = (teams: Team[], groupTeams: GroupTeam[]): TeamStatsMap =>
   Object.fromEntries(
@@ -19,6 +19,10 @@ export const buildTeamStats = (teams: Team[], groupTeams: GroupTeam[]): TeamStat
         totalPointsStanding: 0,
         totalPointsAgainstSitting: 0,
         totalPointsAgainstStanding: 0,
+        placeSitting: 0,
+        placeStanding: 0,
+        placementScoreSitting: 0,
+        placementScoreStanding: 0,
         finalScore: 0,
       },
     ])
@@ -62,7 +66,10 @@ const awardPlacementScores = (
   groups.forEach((group) => {
     const ranked = sortTeamStatsByDiscipline(teamStatsForGroup(teamStats, groupTeams, group.id), discipline)
     ranked.forEach((stats, index) => {
-      stats.finalScore += placementScores[index] ?? 0
+      const score = placementScores[index] ?? 0
+      stats[`place${discipline}`] = index + 1
+      stats[`placementScore${discipline}`] = score
+      stats.finalScore += score
     })
   })
 }
